@@ -75,6 +75,7 @@ Never Alone is a **multilingual, voice-based AI companion** that talks, listens,
 
 ### Planning
 - [MVP Roadmap (90 Days)](./docs/planning/mvp-roadmap.md)
+- [**Safety-First Design Philosophy**](./docs/planning/safety-first-design.md) ⚠️ **Critical**
 - [Open Questions](./docs/planning/open-questions.md)
 - [Next Steps](./docs/planning/next-steps.md)
 

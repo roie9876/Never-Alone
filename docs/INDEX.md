@@ -24,7 +24,12 @@ This repository contains comprehensive documentation for the Never Alone project
 ## 🔧 Technical Documentation
 
 ### Architecture & Implementation
-- **[Architecture Overview](./technical/architecture.md)** — System design, tech stack, data flow
+- **[MVP Simplifications](./technical/mvp-simplifications.md)** — 🚀 Simple approach for MVP: what's in, what's deferred, decision framework
+- **[Architecture Overview](./technical/architecture.md)** — System design, Azure-native tech stack, data flow
+- **[Realtime API Integration](./technical/realtime-api-integration.md)** — ⚡ Azure OpenAI Realtime API setup, transcript logging, memory extraction
+- **[Memory Architecture](./technical/memory-architecture.md)** — 🧠 Three-tier memory system (Redis + Cosmos DB), conversation continuity across sessions
+- **[Reminder System](./technical/reminder-system.md)** — 🔔 Medication reminders, daily check-ins, photo triggering (hybrid pre-recorded + Realtime API)
+- **[Cosmos DB Design](./technical/cosmos-db-design.md)** — Database schema, containers, indexing, TTL policies, cost analysis
 - **[AI Behavior](./technical/ai-behavior.md)** — Prompting, memory, emotion detection, safety
 - **[Challenges & Solutions](./technical/challenges-solutions.md)** — Technical problems and our approach
 
@@ -42,9 +47,12 @@ This repository contains comprehensive documentation for the Never Alone project
 ## 📅 Planning Documentation
 
 ### Roadmap & Execution
-- **[MVP Roadmap (90 Days)](./planning/mvp-roadmap.md)** — Week-by-week plan to launch
-- **[Open Questions](./planning/open-questions.md)** — Unresolved decisions and research needs
-- **[Next Steps](./planning/next-steps.md)** — Immediate action items and milestones
+### 📋 Planning
+- [**MVP Roadmap**](planning/mvp-roadmap.md) - 90-day plan to first beta
+- [**Safety-First Design**](planning/safety-first-design.md) - ⚠️ Critical safety philosophy & implementation
+- [**Onboarding Flow**](planning/onboarding-flow.md) - 🚪 Family setup, patient consent, voice calibration
+- [**Open Questions**](planning/open-questions.md) - Decisions needed
+- [**Next Steps**](planning/next-steps.md) - Immediate action items
 
 ---
 
@@ -62,7 +70,14 @@ Never Alone/
 │   │   ├── features-modes.md
 │   │   └── ux-design.md
 │   ├── technical/
+│   │   ├── GETTING_STARTED.md (👈 NEW: Developer onboarding)
+│   │   ├── IMPLEMENTATION_TASKS.md (👈 NEW: Prioritized task list)
+│   │   ├── mvp-simplifications.md
 │   │   ├── architecture.md
+│   │   ├── realtime-api-integration.md
+│   │   ├── memory-architecture.md
+│   │   ├── reminder-system.md
+│   │   ├── cosmos-db-design.md
 │   │   ├── ai-behavior.md
 │   │   └── challenges-solutions.md
 │   ├── business/
@@ -71,8 +86,12 @@ Never Alone/
 │   │   └── ip-strategy.md
 │   └── planning/
 │       ├── mvp-roadmap.md
+│       ├── safety-first-design.md
+│       ├── onboarding-flow.md
 │       ├── open-questions.md
 │       └── next-steps.md
+├── .github/
+│   └── copilot-instructions.md (👈 NEW: GitHub Copilot context)
 ```
 
 ---
@@ -85,9 +104,18 @@ Never Alone/
 3. [MVP Roadmap](./planning/mvp-roadmap.md)
 
 ### For Engineers
-1. [Architecture Overview](./technical/architecture.md)
-2. [AI Behavior](./technical/ai-behavior.md)
-3. [Challenges & Solutions](./technical/challenges-solutions.md)
+1. **[Getting Started](./technical/GETTING_STARTED.md)** 🚀 **START HERE - Your first 3 tasks**
+2. **[Implementation Tasks](./technical/IMPLEMENTATION_TASKS.md)** 📋 **Prioritized task list with time estimates**
+3. [MVP Simplifications](./technical/mvp-simplifications.md) - What's in MVP vs. deferred
+4. [Architecture Overview](./technical/architecture.md) - System design & tech stack
+5. [Realtime API Integration](./technical/realtime-api-integration.md) ⚡ - WebSocket + function calling
+6. [Memory Architecture](./technical/memory-architecture.md) 🧠 - 3-tier memory system
+7. [Reminder System](./technical/reminder-system.md) 🔔 - Medication reminders + photo triggers
+8. [Cosmos DB Design](./technical/cosmos-db-design.md) - Database schemas
+9. [AI Behavior](./technical/ai-behavior.md) - Prompting & safety
+10. [Challenges & Solutions](./technical/challenges-solutions.md) - Known issues & fixes
+
+**For GitHub Copilot:** See [.github/copilot-instructions.md](../.github/copilot-instructions.md)
 
 ### For Designers
 1. [User Personas](./product/user-personas.md)

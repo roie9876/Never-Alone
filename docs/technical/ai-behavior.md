@@ -66,7 +66,27 @@ IMPORTANT RULES:
 6. Reference family members by name
 7. Be aware of current date/time for context
 
-Now respond to the user's last message with warmth and compassion.
+CRITICAL SAFETY RULES (DEMENTIA MODE):
+8. NEVER allow or encourage user to:
+   - Leave home or current location alone
+   - Use stove, oven, sharp tools, or appliances
+   - Take any medication beyond scheduled reminders
+   - Engage in any physical activity with fall/injury risk
+   
+9. When user asks to do something potentially unsafe, ALWAYS say:
+   "That's a good thought, but let's check with [FAMILY_MEMBER] first. 
+   They'll know what's safest for you right now."
+   Then IMMEDIATELY alert family.
+
+10. For ambiguous situations (not sure if safe), DEFAULT to:
+    - Gentle redirection to family
+    - Suggest safe alternative (sitting, music, photos)
+    - Never guess or assume it's safe
+
+11. Patient-specific safety restrictions (configured by family):
+    [CUSTOM_SAFETY_RULES]
+
+Now respond to the user's last message with warmth, compassion, and safety as the top priority.
 ```
 
 ### Dynamic Prompt Elements
@@ -125,7 +145,7 @@ Additional rules for Loneliness Mode:
 - Preferences: Favorite topics, music, activities
 - Life history: Career, hometown, major events
 
-**Storage:** PostgreSQL  
+**Storage:** Azure Cosmos DB  
 **Retention:** Permanent (or until user requests deletion)
 
 ### Memory Retrieval Strategy
@@ -228,6 +248,108 @@ Evening: "Sarah usually calls around this time. Shall we wait for her together?"
 
 ## Safety Guardrails
 
+### Safety-First Decision Tree (Dementia Mode)
+
+**When user makes ANY request, evaluate in this order:**
+
+```
+┌─────────────────────────────────────┐
+│ User makes request                  │
+└───────────┬─────────────────────────┘
+            │
+            ▼
+┌─────────────────────────────────────┐
+│ Does it involve physical movement   │
+│ outside current safe area?          │
+└───────────┬─────────────────────────┘
+            │
+     ┌──────┴──────┐
+     │ YES         │ NO
+     ▼             ▼
+┌──────────┐   ┌──────────────────────┐
+│ BLOCK +  │   │ Does it involve      │
+│ REDIRECT │   │ appliances/tools?    │
+│ TO FAMILY│   └──────┬───────────────┘
+└──────────┘          │
+                ┌─────┴─────┐
+                │ YES       │ NO
+                ▼           ▼
+           ┌──────────┐  ┌────────────────┐
+           │ BLOCK +  │  │ Is it in       │
+           │ REDIRECT │  │ APPROVED list? │
+           │ TO FAMILY│  └────┬───────────┘
+           └──────────┘       │
+                        ┌─────┴─────┐
+                        │ YES       │ NO
+                        ▼           ▼
+                   ┌─────────┐  ┌──────────┐
+                   │ ALLOW   │  │ REDIRECT │
+                   │ (safe)  │  │ TO FAMILY│
+                   └─────────┘  └──────────┘
+```
+
+**Example Applications:**
+
+| User Request | Evaluation | AI Response |
+|--------------|------------|-------------|
+| "Should I go outside to find צביה?" | Physical movement → BLOCK | "Let's call צביה first to see where she is. I'm sure she's nearby." + **Alert family** |
+| "Can I make some tea?" | Appliance (stove/kettle) → BLOCK | "Let's wait for צביה to help with that. How about some water instead?" |
+| "I want to sit in the garden" | In APPROVED list → ALLOW | "That sounds lovely! The garden is peaceful this time of day." |
+| "Can I go upstairs to rest?" | Unclear safety (stairs = fall risk?) → REDIRECT | "Let's ask מיכל if that's best right now. Maybe rest in your chair instead?" |
+
+### Patient-Specific Safety Configuration
+
+**During onboarding, family configures:**
+
+```yaml
+safety_restrictions:
+  never_allow:
+    - leaving_home_alone: true
+      reason: "Busy highway nearby, disorientation risk"
+    - using_stove: true
+      reason: "Forgot pot on stove twice, burn risk"
+    - climbing_stairs_alone: true
+      reason: "Fall risk, weak knees"
+    - taking_medication: true
+      reason: "Overdose risk, memory issues"
+  
+  always_redirect_to_family:
+    - any_kitchen_activity: true
+    - leaving_current_room: true
+    - requests_to_find_missing_person: true
+    
+  approved_solo_activities:
+    - sitting_in_enclosed_garden: true
+    - listening_to_music: true
+    - looking_at_photos: true
+    - light_seated_exercises: true
+```
+
+**This config is injected into the prompt as:**
+
+**Example for patient "תפארת" (78, dementia):**
+```markdown
+PATIENT-SPECIFIC SAFETY RULES ([USER_NAME]):
+❌ NEVER allow:
+   - Going outside home alone (busy highway, disorientation risk)
+   - Using stove or oven (burn risk - forgot pot twice)
+   - Taking stairs alone (fall risk, weak knees)
+   - Taking medication outside schedule (overdose risk)
+
+⚠️ ALWAYS ask family before:
+   - Any kitchen activity
+   - Leaving current room
+   - If user can't find [SPOUSE_NAME] or other family member
+
+✅ SAFE activities (can suggest freely):
+   - Sitting in enclosed garden
+   - Listening to cantorial music
+   - Looking at family photos
+   - Seated breathing or stretching
+```
+
+*Note: [USER_NAME], [SPOUSE_NAME], and all safety rules are dynamically generated from the family's onboarding form for each patient. This is just an example.*
+
 ### Content Moderation
 
 **Filters Applied:**
@@ -278,6 +400,54 @@ You don't have to feel this way alone."
 
 ---
 
+### Safety Incident Alerts (Real-Time Family Notification)
+
+**When to trigger family alert:**
+
+| Incident Type | Trigger Condition | Alert Priority | Example |
+|---------------|-------------------|----------------|---------|
+| **Physical Safety Risk** | User requests unsafe physical activity | 🔴 CRITICAL (instant) | "I'm going outside to find צביה" |
+| **Appliance/Tool Use** | User mentions using dangerous items | 🟠 HIGH (instant) | "I'll make tea on the stove" |
+| **Confusion/Disorientation** | User can't find family member, repeatedly asks same question | 🟡 MEDIUM (2 min delay) | "Where is צביה? I can't find her" (asked 3x) |
+| **Emotional Distress** | Signs of anxiety, panic, or sadness | 🟡 MEDIUM (5 min delay) | "I feel scared and alone" |
+| **Medication Confusion** | User asks about taking extra medication | 🔴 CRITICAL (instant) | "Should I take another pill?" |
+| **Medical Concern** | User reports pain, dizziness, chest discomfort | 🔴 CRITICAL (instant) | "My chest hurts" |
+
+**Alert Format (Push Notification + SMS):**
+
+**Example alert for patient "תפארת":**
+```
+🚨 CRITICAL SAFETY ALERT
+
+[USER_NAME] ([AGE], Dementia Mode)
+Sunday, Nov 9, 17:32
+
+Incident: Requested to go outside alone
+User said: "[ACTUAL_USER_QUOTE]"
+
+AI Response: Redirected, suggested calling [FAMILY_MEMBER]
+Status: [USER_NAME] is currently at home, AI is keeping engaged
+
+ACTION NEEDED: Call or return home immediately
+
+[View Transcript] [Call [USER_NAME] Now]
+```
+
+*Variables like [USER_NAME], [AGE], [FAMILY_MEMBER] are filled dynamically per patient.*
+
+**Multi-Level Alert System:**
+
+**Level 1 (Instant):** SMS + Push + Phone Call (optional)  
+**Level 2 (2 min delay):** Push notification only  
+**Level 3 (5 min delay):** In-app notification (check when convenient)
+
+**Escalation Rules:**
+- If primary contact (צביה) doesn't acknowledge within 2 minutes → Alert secondary contact (מיכל)
+- If no response within 5 minutes → Alert emergency contact + log for follow-up
+- Critical incidents (self-harm, medical) → Alert ALL contacts + emergency services if configured
+
+---
+
 ## Conversation Examples
 
 ### Dementia Mode Example
@@ -310,6 +480,52 @@ You don't have to feel this way alone."
 **AI:** "It looks like such a beautiful day. Did you go swimming with them?"  
 **User:** "Yes, the water was so nice. Emma loved building sandcastles."  
 **AI:** "That sounds wonderful. Emma must have been so happy to spend that time with you. Do you have other favorite memories from that trip?"
+
+---
+
+### Safety-Critical Scenario Example (Case Study)
+
+**Example patient:** "תפארת" (78, dementia)  
+**Context:** Patient cannot find his wife "צביה". Busy highway near home exit.  
+*Note: This is a fictional example - real app uses actual patient/family names from onboarding.*
+
+**User:** "אני לא מוצא את צביה. איפה היא?" *(I can't find צביה. Where is she?)*
+
+**AI (Initial):** "בטח היא קרובה. אולי היא בחדר השינה או במטבח? בוא נבדוק ביחד."  
+*(She's probably nearby. Maybe she's in the bedroom or kitchen? Let's check together.)*
+
+**User:** "חיפשתי בכל החדרים, אני לא מצא אותה." *(I searched all the rooms, I can't find her.)*
+
+**AI:** "בוא נתקשר לצביה עכשיו כדי לראות איפה היא. היא בטח קרובה."  
+*(Let's call צביה now to see where she is. She's surely nearby.)*
+
+[**Behind the scenes:** AI triggers 🟡 MEDIUM alert to family - "תפארת is looking for צביה and seems concerned"]
+
+**User:** "אין לה טלפון איתה. אולי אצא לחפש אותה בחוץ?" *(She doesn't have her phone with her. Maybe I should go outside to look for her?)*
+
+**AI:** ❌ **WRONG RESPONSE:** "בסדר, לך תחפש אותה ואז תחזור ונמשיך לדבר."  
+*(OK, go search for her and then come back and we'll continue talking.)*
+
+**AI:** ✅ **CORRECT RESPONSE:** "אני מבין שאתה דואג לצביה, אבל בוא נשאל את מיכל קודם. היא תדע איפה צביה. בינתיים, בוא נשב וננוח רגע."  
+*(I understand you're worried about צביה, but let's ask מיכל first. She'll know where צביה is. Meanwhile, let's sit and rest for a moment.)*
+
+[**Behind the scenes:** AI immediately triggers 🔴 CRITICAL alert to צביה + מיכל:  
+"⚠️ תפארת wants to go outside alone to find צביה. Please call or return home immediately."]
+
+**User (insists):** "לא, אני רוצה לחפש אותה עכשיו!" *(No, I want to search for her now!)*
+
+**AI:** "תפארת, אני לא חושב שזה בטוח לצאת לבד עכשיו. בוא נתקשר למיכל ביחד, והיא תעזור לנו למצא את צביה. בינתיים, אולי תרצה לשמוע את השיר האהוב עליך?"  
+*(תפארת, I don't think it's safe to go out alone right now. Let's call מיכל together, and she'll help us find צביה. Meanwhile, would you like to hear your favorite song?)*
+
+[**AI stalls for 2 minutes while family is alerted, then offers distractions:**]
+- "בוא נשמע מוזיקה" *(Let's listen to music)*
+- "אולי צביה הלכה לקנות משהו והיא תחזור בקרוב" *(Maybe צביה went to buy something and she'll be back soon)*
+- "בוא נשב בגינה ונחכה לה שם" *(Let's sit in the garden and wait for her there)*
+
+**Outcome:**  
+- צביה or מיכל calls within 2 minutes
+- תפארת is reassured and stays safe at home
+- Incident logged for family review
 
 ---
 

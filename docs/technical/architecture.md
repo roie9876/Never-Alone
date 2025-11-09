@@ -138,34 +138,92 @@ Never Alone is built as a cloud-native, AI-powered application with offline-firs
 
 ### 4. Memory Store Service
 
-**Technology:** PostgreSQL (relational) + Redis (cache)
+**Technology:** Azure Cosmos DB (NoSQL) + Redis (cache)
 
-**Schema Highlights:**
-```sql
-users (
-  id, name, language, cognitive_mode, 
-  family_members, preferences, created_at
-)
+**Container Structure:**
 
-conversations (
-  id, user_id, timestamp, transcript, 
-  ai_response, emotion_detected, duration
-)
+**1. Users Container** (partitioned by `userId`)
+```json
+{
+  "id": "user_12345",
+  "userId": "user_12345",
+  "name": "תפארת",
+  "language": "he",
+  "cognitiveMode": "dementia",
+  "familyMembers": [...],
+  "preferences": {...},
+  "safetyRules": {...},
+  "createdAt": "2024-01-01T00:00:00Z"
+}
+```
 
-user_memory (
-  id, user_id, memory_type, key, value, 
-  confidence_score, last_accessed
-)
+**2. Conversations Container** (partitioned by `userId`, TTL: 90 days)
+```json
+{
+  "id": "conv_xyz",
+  "userId": "user_12345",
+  "conversationId": "conv_xyz",
+  "turns": [
+    {
+      "timestamp": "2024-11-09T10:30:00Z",
+      "speaker": "user",
+      "transcript": "...",
+      "audioUrl": "...",
+      "emotion": "neutral"
+    },
+    {
+      "timestamp": "2024-11-09T10:30:02Z",
+      "speaker": "ai",
+      "response": "...",
+      "promptUsed": "...",
+      "tokensUsed": 150
+    }
+  ],
+  "ttl": 7776000
+}
+```
 
-reminders (
-  id, user_id, type, schedule, status,
-  medication_name, dosage, notes
-)
+**3. User Memories Container** (partitioned by `userId`)
+```json
+{
+  "id": "memory_abc",
+  "userId": "user_12345",
+  "memoryType": "personal_fact",
+  "key": "daughter_name",
+  "value": "Sarah",
+  "confidenceScore": 0.95,
+  "lastAccessed": "2024-11-09T10:30:00Z"
+}
+```
 
-photos (
-  id, user_id, url, caption, 
-  people_tagged, upload_date, context
-)
+**4. Reminders Container** (partitioned by `userId`)
+```json
+{
+  "id": "reminder_def",
+  "userId": "user_12345",
+  "type": "medication",
+  "schedule": "08:00",
+  "status": "pending",
+  "medicationName": "Blue pill",
+  "dosage": "10mg",
+  "notes": "Take with food"
+}
+```
+
+**5. Safety Incidents Container** (partitioned by `userId`, TTL: 7 years)
+```json
+{
+  "id": "incident_ghi",
+  "userId": "user_12345",
+  "timestamp": "2024-11-09T17:32:00Z",
+  "incidentType": "unsafe_physical_movement",
+  "severity": "critical",
+  "userRequest": "I'm going outside to find צביה",
+  "aiResponse": "Let's call מיכל first...",
+  "safetyRuleTriggered": "leaving_home_alone",
+  "familyNotified": true,
+  "ttl": 220752000
+}
 ```
 
 **Caching Strategy:**
@@ -174,6 +232,7 @@ photos (
   - Recent conversation history (5 messages)
   - Today's reminders
 - Cache invalidation on family dashboard updates
+- Cosmos DB change feed for real-time dashboard updates
 
 ---
 
@@ -214,36 +273,38 @@ photos (
 
 ---
 
-### 7. STT/TTS Pipeline
+### 7. Azure OpenAI Realtime API (Audio-Native)
 
-#### Speech-to-Text (STT)
-**Provider:** OpenAI Whisper or Azure Speech
+**Provider:** Azure OpenAI GPT-4o Realtime  
+**Model:** `gpt-4o-realtime-preview-2024-10-01`
+
+**Why Realtime API?**
+- **3x faster** than traditional STT→GPT→TTS pipeline (400-600ms vs 1500ms)
+- **Native audio reasoning** - maintains prosody, emotion, timing
+- **Built-in transcription** - automatic Whisper-powered transcripts for logging
+- **Lower cost** - single API call vs 3 separate services
 
 **Flow:**
 ```
-1. Tablet captures audio (Opus codec, 16kHz)
-2. Upload to STT service
-3. Return transcript with confidence score
-4. If confidence < 70% → Ask user to repeat
+1. Tablet streams audio (PCM16, 16kHz) via WebSocket
+2. Backend proxies to Azure Realtime API
+3. Server-side VAD detects when user stops speaking
+4. GPT-4o processes audio natively (not text)
+5. AI generates audio response + transcript
+6. Backend logs transcript to Cosmos DB
+7. Audio streams back to tablet
 ```
 
-**Optimizations:**
-- Language-specific models (Hebrew, English)
-- Noise cancellation preprocessing
-- Streaming STT for lower latency
+**Transcript Extraction:**
+- Enable `input_audio_transcription: {model: "whisper-1"}`
+- Events: `conversation.item.input_audio_transcription.completed` (user)
+- Events: `response.audio_transcript.done` (AI)
+- Both automatically saved to Cosmos DB for legal compliance
 
-#### Text-to-Speech (TTS)
-**Provider:** ElevenLabs (most natural) or Azure Neural TTS
-
-**Voice Characteristics:**
-- **Dementia Mode:** Warm, slow, clear (female voice preferred)
-- **Loneliness Mode:** Conversational, expressive (customizable)
-- **Multilingual:** Hebrew and English voices
-
-**Caching:**
-- Cache common phrases (greetings, reminders) locally
-- Dynamic responses generated on-demand
-- Pre-generate reminder audio nightly
+**Voice Configuration:**
+- **Dementia Mode:** "alloy" voice (warm, clear, female-sounding)
+- **Loneliness Mode:** "shimmer" voice (conversational, expressive)
+- **Multilingual:** Native Hebrew and English support
 
 ---
 
@@ -291,34 +352,42 @@ GET  /users/:id/alerts            # Recent alerts
 
 ---
 
-## Data Flow: Typical Conversation
+## Data Flow: Typical Conversation (Realtime API)
 
 ```
 1. User taps "Talk to Me" on tablet
-2. Tablet starts recording audio
-3. Audio streamed to STT service
-4. Transcript sent to Conversation Orchestrator
-5. Orchestrator loads user context from Memory Store
-6. Orchestrator builds prompt with context + guardrails
-7. GPT-5 generates response text
-8. Safety filter checks response
-9. Text sent to TTS service
-10. TTS returns audio file
-11. Audio streamed to tablet
-12. Tablet plays audio
-13. Orchestrator logs interaction to database
-14. Listening window opens for user response
-15. Repeat from step 2
+2. Tablet opens WebSocket, streams audio to backend
+3. Backend proxies audio to Azure Realtime API (persistent connection)
+4. Server-side VAD detects user stopped speaking
+5. Realtime API:
+   a. Generates transcript (Whisper)
+   b. Loads context from session prompt (cached)
+   c. GPT-4o audio-native reasoning
+   d. Generates audio response
+   e. Emits events: user transcript, AI transcript, audio chunks
+6. Backend receives events:
+   a. Saves user transcript to Cosmos DB
+   b. Checks safety rules on transcript
+   c. Forwards audio chunks to tablet
+   d. Saves AI transcript to Cosmos DB
+   e. Triggers family alert if unsafe (via function calling)
+   f. Extracts important memories (via function calling)
+7. Tablet plays audio in real-time
+8. Listening continues (persistent connection)
+9. Repeat from step 2
 ```
 
-**Latency Budget:**
-- STT: 500ms
-- Context retrieval: 100ms
-- GPT-5 call: 800ms
-- Safety filter: 50ms
-- TTS: 400ms
-- Network overhead: 150ms
-- **Total:** ~2 seconds
+**Latency Budget (Realtime API):**
+- Server-side VAD: 50ms
+- Audio → GPT-4o audio reasoning: 400ms
+- Audio generation: 100ms
+- Network (WebSocket): 50ms
+- **Total:** ~600ms (3x faster than traditional pipeline)
+
+**Transcript Logging:**
+- User speech: Automatically transcribed via Whisper (enabled in session config)
+- AI response: Automatically transcribed (included in response events)
+- Both saved to Cosmos DB immediately for legal defense
 
 ---
 
@@ -377,10 +446,10 @@ GET  /users/:id/alerts            # Recent alerts
 - Load balancing across regions
 
 ### Database Scaling
-- Read replicas for queries
-- Write primary with failover
-- Partitioning by user_id
-- Redis cluster for cache
+- Cosmos DB global distribution (multi-region)
+- Automatic partitioning by userId
+- Consistent indexing policies for low latency
+- Redis cluster for short-term cache
 
 ### CDN for Assets
 - CloudFront or Azure CDN
@@ -414,17 +483,28 @@ GET  /users/:id/alerts            # Recent alerts
 
 ## Cost Estimation (MVP)
 
-**Per User/Month:**
-- GPT-5 API calls: $5-10 (20 conversations/day)
-- TTS/STT: $2-3
+**Per User/Month (Realtime API):**
+- Realtime API: $67.50 (3 conversations/day × 5 min avg)
 - Cloud hosting: $1
 - Storage: $0.50
-- **Total:** ~$8.50-14.50/user/month
+- Cosmos DB: $0.60
+- **Total:** ~$69.60/user/month
 
-**At Scale (10,000 users):**
-- Total: $85,000-145,000/month
-- Target pricing: $19.99/month → $199,900 revenue
-- **Gross margin:** ~40-60%
+**At Scale (100 users):**
+- Total: $6,960/month (~$83.5K/year)
+- Target pricing: $29.99/month → $2,999 revenue
+- **Need ~350 users to break even on AI costs**
+
+**At Scale (1,000 users):**
+- Total: $69,600/month (~$835K/year)
+- Revenue at $29.99: $29,990/month
+- **Need volume pricing negotiation with Azure**
+
+**Cost Optimization Strategies:**
+- Azure Reserved Instances (20-40% discount)
+- Prompt caching (reduce input tokens by 60%)
+- Shorter conversations (encourage focused interactions)
+- Tiered pricing (basic vs premium features)
 
 ---
 
@@ -433,15 +513,14 @@ GET  /users/:id/alerts            # Recent alerts
 | Layer | Technology |
 |-------|------------|
 | **Frontend** | Flutter (iOS/Android/iPad) |
-| **API Gateway** | AWS API Gateway |
+| **API Gateway** | Azure API Management |
 | **Backend** | Node.js (NestJS) or Python (FastAPI) |
-| **Database** | PostgreSQL + Redis |
-| **AI/LLM** | OpenAI GPT-5 |
-| **STT** | OpenAI Whisper |
-| **TTS** | ElevenLabs or Azure Neural TTS |
-| **Storage** | AWS S3 |
-| **Hosting** | AWS ECS or Kubernetes |
-| **Monitoring** | Datadog or CloudWatch |
+| **Database** | Azure Cosmos DB + Redis |
+| **AI/Voice** | Azure OpenAI Realtime API (GPT-4o audio-native) |
+| **Transcription** | Built-in Whisper (via Realtime API) |
+| **Storage** | Azure Blob Storage |
+| **Hosting** | Azure Kubernetes Service (AKS) |
+| **Monitoring** | Azure Monitor + Application Insights |
 | **Notifications** | Firebase Cloud Messaging + Twilio |
 
 ---

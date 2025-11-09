@@ -6,13 +6,42 @@ This document tracks unresolved questions and decisions that need to be made. Up
 
 ## Product & Design
 
-### 1. Visual Identity & Branding
+### 1. **Safety Configuration System** 🆕 ⚠️ **CRITICAL**
+
+**Core Approach Decision:** ✅ **RESOLVED**
+- Use **onboarding form** filled by family member during setup
+- Form generates **patient-specific safety rules** dynamically injected into AI prompt
+- Universal rules (medication, self-harm) = hardcoded in base prompt
+- Patient-specific rules (going outside, using kitchen) = configured per patient
+
+**Decisions Made:**
+- [x] **Mandatory fields:** ✅ **ALL safety fields are mandatory** - Cannot activate app without completing safety configuration
+- [x] **Safety rule conflicts:** ✅ **POC approach** - Start with single primary caregiver, no multi-user conflicts for MVP
+- [x] **Condition deterioration:** ✅ **Auto-escalate** - Prompt family every 30 days to review rules + auto-escalate restrictions if incidents detected
+- [x] **Multi-language forms:** ✅ **Hebrew only for MVP** - Focus on single language for proof-of-concept
+
+**Remaining Questions:**
+- [ ] **Form complexity:** How long should onboarding take? (Target: < 10 minutes)
+- [ ] **Emergency authority:** Should AI be allowed to call emergency services (911) without family approval?
+- [ ] **Legal liability:** Who is responsible if family misconfigures safety rules and patient is harmed?
+  - Should we require legal waiver acknowledging AI limitations?
+  - Disclaimer: "AI is not a substitute for human supervision"
+- [ ] **User override:** Should patient be able to override AI safety blocks? (e.g., "I'm calling my daughter, it's fine")
+- [ ] **Alert fatigue:** How to prevent family from ignoring alerts due to over-alerting?
+- [ ] **Updates & edits:** Can family edit safety rules anytime? Does it require re-validation?
+
+**Decision deadline:** Before beta launch  
+**Related:** See `/docs/planning/safety-first-design.md`
+
+### 2. Visual Identity & Branding
 - [ ] **Logo design:** Should it be warm/human or clean/tech?
 - [ ] **Color palette:** Soft blues? Greens? What feels most comforting?
 - [ ] **Voice/personality:** How much personality should the AI have? (More human-like vs. clearly AI)
 - [ ] **Avatar:** Should there be a visual avatar/character, or text-only?
 
 ### 2. AI Voice Selection
+- [x] **Hebrew quality:** ✅ **Tested and sounds very good** - Azure Realtime API Hebrew prosody validated by user
+- [x] **Code-switching:** ✅ **Hebrew only for MVP** - No mixed language support (Hebrew/Yiddish/English) in proof-of-concept
 - [ ] **Dementia Mode voice:** Male or female? What age? (Preliminary research suggests warm female voice, 40-50 years old)
 - [ ] **Loneliness Mode voice:** Same voice or different? Customizable?
 - [ ] **Multilingual voices:** Which Hebrew voice sounds most natural?
@@ -34,7 +63,8 @@ This document tracks unresolved questions and decisions that need to be made. Up
 ## Technical
 
 ### 5. Platform Priorities
-- [ ] **iOS vs. Android first?** (iPad has better accessibility features, but Android has larger market share)
+- [x] **iOS vs. Android first?** ✅ **MVP runs on Mac only** - No tablet app yet, desktop prototype first to validate architecture
+- [x] **Mobile apps:** Flutter chosen for future iOS/Android development (better audio streaming performance)
 - [ ] **Web version:** Should family dashboard have a lite web version for user access?
 - [ ] **Offline capabilities:** How long should app function offline? (24 hours? 72 hours?)
 
@@ -44,9 +74,10 @@ This document tracks unresolved questions and decisions that need to be made. Up
 - [ ] **Enrollment complexity:** How much voice data do we need for accurate verification?
 
 ### 7. Data Storage & Privacy
-- [ ] **Voice recordings:** Should we ever store raw audio, even temporarily? (Privacy vs. quality improvement)
-- [ ] **Conversation retention:** 90 days auto-delete? User configurable?
-- [ ] **Family access:** Should users be able to see what family members view? (Transparency vs. complexity)
+- [x] **Voice recordings:** ✅ **Transcripts only, audio deleted immediately** - No raw audio storage for MVP
+- [x] **Conversation retention:** ✅ **90 days auto-delete** - Standard TTL policy in Cosmos DB (Conversations container)
+- [x] **Family access (Dementia/Alzheimer's):** ✅ **Full transcript access by default** - No opt-in required for cognitive impairment cases
+- [x] **Real-time status:** ✅ **No live conversation indicator** - Too expensive and complex for MVP
 - [ ] **Data exports:** What format? (JSON? CSV? PDF report?)
 
 ### 8. AI Model Selection
@@ -59,12 +90,17 @@ This document tracks unresolved questions and decisions that need to be made. Up
 ## Business & Pricing
 
 ### 9. Pricing Strategy
+- [x] **Pricing approach:** ✅ **Focus on MVP first, defer pricing** - Get cost reality from real usage before setting prices
+- [x] **Who pays:** ✅ **Family members pay** - Dementia/Alzheimer's patients cannot manage payments
+- [x] **Tablet subsidy:** ✅ **Deferred** - MVP runs on Mac, tablet distribution decisions postponed until architecture validated
 - [ ] **Free tier:** Should we offer free tier indefinitely, or time-limited trial?
 - [ ] **Enterprise pricing:** Per-user or site license for care homes?
 - [ ] **Family plan:** 2 users for $30, or separate subscriptions?
 - [ ] **Annual discount:** 2 months free (16% off) or 3 months free (25% off)?
 
 ### 10. Target Market Priority
+- [x] **Initial users:** ✅ **Personal family for MVP** - Use founder's own family members for first testing
+- [x] **Beta criteria:** ✅ **Undecided** - Specific inclusion/exclusion criteria to be determined during MVP development
 - [ ] **Israel first vs. U.S. first?** (Smaller market, easier logistics vs. larger TAM)
 - [ ] **B2C vs. B2B focus:** Should we prioritize families or care homes?
 - [ ] **Age group:** 65+ only, or open to younger lonely people (50+)?
@@ -79,6 +115,9 @@ This document tracks unresolved questions and decisions that need to be made. Up
 ## Legal & Compliance
 
 ### 12. Medical Device Classification
+- [x] **Device classification:** ✅ **Wellbeing companion, NOT medical device** - Confirmed positioning
+- [x] **Medication approach:** ✅ **Verbal confirmation only for MVP** - No smart pill dispenser integration yet
+- [x] **Data residency:** ✅ **Azure Israel Central region** - Israeli patient data can be stored there
 - [ ] **Confirm non-medical status:** Do we need formal FDA pre-submission to confirm?
 - [ ] **Medication reminders:** Are reminders "medical" if they mention specific medications?
 - [ ] **Insurance reimbursement:** If Medicare/Medicaid covers it, does that change classification?
@@ -196,6 +235,74 @@ For each open question:
 - **Technical questions:** Technical Lead
 - **Legal questions:** Legal Counsel (external)
 - **Business questions:** CEO/Founder
+
+---
+
+---
+
+## 🔴 Critical Blockers (MVP Risks)
+
+### 25. AI-Initiated Conversations (Dementia Mode) ✅ **RESOLVED**
+- [x] **Problem:** Azure OpenAI Realtime API **never initiates conversations** - Always waits for user input
+- [x] **Impact:** Dementia Mode requires AI to proactively check in ("How are you feeling?"), but API doesn't support this
+- [x] **Solution:** ✅ **Hybrid approach - Pre-recorded TTS + Realtime API**
+  - **Scheduled events** (medication, daily check-ins) trigger pre-recorded audio
+  - Audio plays WITHOUT user action (solves "AI never starts" limitation)
+  - User presses button to respond → **Then** Realtime API session starts
+  - AI continues conversation with full context of scheduled event
+- [x] **Example:** 9:00 AM medication reminder:
+  1. Pre-recorded audio plays: "תפארת, הגיע הזמן לקחת תרופות" (Time for medication)
+  2. Screen shows buttons: "אני לוקח עכשיו" / "הזכר לי בעוד 10 דקות" / "דבר איתי"
+  3. User presses button → Realtime API activates with context
+  4. AI confirms verbally and logs transcript for legal compliance
+- [x] **Related:** See `/docs/technical/reminder-system.md` for full implementation details
+
+### 26. Photo Feature - AI Initiation Logic ✅ **RESOLVED**
+- [x] **Approach:** ✅ **Context-aware (conversational triggers)** - Better UX than scheduled
+- [x] **How AI decides to show photos:**
+  - **Primary trigger:** User mentions family member by name → AI offers photos
+  - **Secondary trigger:** User expresses sadness/loneliness → AI suggests photos for comfort
+  - **Engagement reward:** After 10+ minutes of conversation → AI offers new photos as delight
+- [x] **Implementation:** AI uses function calling `trigger_show_photos()` when contextually appropriate
+- [x] **Repetition prevention:**
+  - Track `last_shown_at` timestamp per photo (Cosmos DB)
+  - Query excludes photos shown in last 7 days
+  - Sort by relevance (tagged people match) + least recently shown
+- [x] **User control:** Patient can request photos by name ("Show me Sarah") OR AI initiates
+- [x] **Related:** See `/docs/technical/reminder-system.md` section "Photo Triggering" for implementation
+
+### 27. Emotion Detection Implementation 🆕
+- [ ] **Does GPT-4o Realtime API support emotion analysis?**
+  - If yes: Use built-in analysis (prosody, tone, pitch)
+  - If no: Skip for MVP or use separate sentiment API?
+- [ ] **Verification needed:** Test Realtime API response format for emotion metadata
+- [ ] **MVP decision:** If not natively supported, **defer to post-MVP** (not critical for basic conversations)
+
+### 28. Reminder Notification Flow (Audio Auto-Play) ✅ **RESOLVED**
+- [x] **Approach:** ✅ **Hybrid - Pre-recorded audio + user confirmation** (solves Realtime API limitation)
+- [x] **MVP solution (Mac):** App runs in foreground (kiosk mode)
+  - Backend cron triggers scheduled event (e.g., 9:00 AM medication)
+  - App plays **pre-recorded TTS audio** immediately (no user action needed)
+  - Screen displays large buttons for user response
+  - User selects action → Realtime API session starts with context
+- [x] **Future (iOS/Android):** Background audio permissions + push notifications
+- [x] **Three-button confirmation:**
+  1. "אני לוקח עכשיו" (Taking now) → Immediate Realtime API confirmation
+  2. "הזכר לי בעוד 10 דקות" (Remind in 10 min) → Reschedule
+  3. "דבר איתי" (Talk to me) → Full conversation first, gentle reminder after
+- [x] **Related:** See `/docs/technical/reminder-system.md` for complete flow
+
+### 29. Multi-Language Detection (Future)
+- [ ] **Auto-detect or pre-set?** Should app detect which language user speaks, or configure in profile?
+- [ ] **Real-time switching:** If user code-switches mid-conversation, should AI follow immediately?
+- [ ] **Hebrew dialects:** Sephardic vs. Ashkenazi pronunciation differences - does Whisper handle both?
+- [ ] **MVP decision:** ✅ **Pre-set Hebrew only** - No auto-detection needed for single-language MVP
+
+### 30. Cost Reduction Strategy (Deferred) 🆕
+- [ ] **Prompt caching:** Can we cache user profile + safety rules to reduce input tokens by 60%?
+- [ ] **Volume pricing:** At what user count should we negotiate with Microsoft/Azure?
+- [ ] **Reserved instances:** Should we commit to reserved capacity for 20% discount?
+- [ ] **MVP decision:** ✅ **Ignore optimization for MVP** - Focus on functionality first, optimize after traction
 
 ---
 

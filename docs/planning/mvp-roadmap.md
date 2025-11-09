@@ -42,11 +42,11 @@ This 90-day plan outlines the path from concept to a functional MVP (Minimum Via
 - [ ] File trademark for "Never Alone" (Israel + U.S.)
 
 **Tech Stack Decisions:**
-- [ ] Frontend: Flutter or React Native?
-- [ ] Backend: Node.js (NestJS) or Python (FastAPI)?
-- [ ] Database: PostgreSQL + Redis (confirmed)
-- [ ] Cloud provider: AWS or Azure?
-- [ ] AI provider: OpenAI (GPT-5, Whisper, TTS)
+- [x] **Frontend: ✅ Flutter** (Better performance for audio streaming, true cross-platform, precise accessibility control)
+- [x] **Backend: ✅ Node.js (NestJS)** (Superior WebSocket handling for Realtime API, async I/O, excellent Azure SDK support)
+- [x] Database: ✅ Azure Cosmos DB + Redis (confirmed)
+- [x] Cloud provider: ✅ Azure (confirmed)
+- [x] AI provider: ✅ Azure OpenAI Realtime API (GPT-4o audio-native with built-in transcription)
 
 **Budget:** $5K (legal + trademarks + domains)
 
@@ -55,16 +55,19 @@ This 90-day plan outlines the path from concept to a functional MVP (Minimum Via
 ### Week 2-3: Core MVP Features - Part 1
 
 **Backend Development:**
-- [ ] Set up API Gateway (authentication, routing)
+- [ ] Set up Azure API Management (authentication, routing)
 - [ ] Implement Conversation Orchestrator service
-  - [ ] GPT-5 integration (basic prompt)
-  - [ ] Whisper STT integration
-  - [ ] TTS integration (ElevenLabs or Azure)
-- [ ] Create user database schema
-  - [ ] Users table
-  - [ ] Conversations table
-  - [ ] Reminders table
-- [ ] Memory Store service (basic facts storage)
+  - [ ] Azure OpenAI Realtime API integration (GPT-4o audio-native)
+  - [ ] WebSocket proxy (tablet ↔ Azure Realtime API)
+  - [ ] Event handlers (transcripts, audio, function calls)
+  - [ ] Enable input_audio_transcription for logging
+- [ ] Create Azure Cosmos DB schema
+  - [ ] Users container (partition by userId)
+  - [ ] Conversations container (TTL: 90 days) with transcript turns
+  - [ ] UserMemories container (facts extracted from conversations)
+  - [ ] SafetyIncidents container (TTL: 7 years)
+  - [ ] Reminders container
+- [ ] Memory Store service (Redis short-term + Cosmos DB long-term)
 
 **Frontend Development:**
 - [ ] Design system (colors, typography, components)
@@ -137,7 +140,7 @@ This 90-day plan outlines the path from concept to a functional MVP (Minimum Via
 ### Week 7: Photo Feature (Memory Lane - Basic)
 
 **Photo Upload & Storage:**
-- [ ] S3/Blob storage setup
+- [ ] Azure Blob Storage setup
 - [ ] Photo upload API (family dashboard)
 - [ ] Photo tagging (people names, context)
 - [ ] Photo display on tablet (simple gallery)
@@ -309,18 +312,21 @@ AI: "It looks like a beautiful day. What did you do there?"
 ## MVP Feature Scope
 
 ### ✅ INCLUDED in MVP:
-- Real-time voice conversation (GPT-5 + TTS/STT)
+- Real-time voice conversation (Azure OpenAI Realtime API - audio-native)
+- Automatic transcript logging (user + AI speech) for legal compliance
+- Intelligent memory extraction (AI saves important facts during conversation)
 - Dementia Mode (AI-initiated, no wake word)
 - Large button UI (accessible, simple)
 - Basic reminder system (medication, meals, calls)
 - Family dashboard (web)
   - View activity
+  - View conversation transcripts (opt-in)
   - Create/edit reminders
   - Upload photos
 - Photo viewing (static)
 - Basic AI photo conversations
-- Safety guardrails (medical advice filter, crisis detection)
-- SMS alerts to family (critical reminders missed)
+- Safety guardrails (function calling for alerts, medical advice filter, crisis detection)
+- SMS alerts to family (critical reminders missed, unsafe requests)
 - Hebrew + English support
 
 ### ❌ NOT INCLUDED in MVP (Post-MVP):
