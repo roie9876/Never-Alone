@@ -1,0 +1,55 @@
+/**
+ * Realtime API Interfaces
+ * Types for Azure OpenAI Realtime API integration
+ * Reference: docs/technical/realtime-api-integration.md
+ */
+
+export interface RealtimeSessionConfig {
+  userId: string;
+  voice?: 'alloy' | 'echo' | 'shimmer';
+  language?: string;
+  maxDuration?: number; // seconds
+}
+
+export interface RealtimeSession {
+  id: string;
+  userId: string;
+  conversationId: string;
+  startedAt: string;
+  status: 'active' | 'ended' | 'error';
+  turnCount: number;
+  tokenUsage: number;
+}
+
+export interface FunctionCallResult {
+  functionName: string;
+  arguments: any;
+  result: any;
+  timestamp: string;
+}
+
+export interface SystemPromptContext {
+  userName: string;
+  userAge: number;
+  language: string;
+  cognitiveMode: string;
+  familyMembers: Array<{ name: string; relationship: string }>;
+  safetyRules: any;
+  memories: {
+    shortTerm: any[];
+    working: any;
+    longTerm: any[];
+  };
+}
+
+export interface AudioChunk {
+  delta: string; // base64 encoded audio
+  timestamp: string;
+}
+
+export interface TranscriptEvent {
+  role: 'user' | 'assistant';
+  transcript: string;
+  timestamp: string;
+  itemId: string;
+}

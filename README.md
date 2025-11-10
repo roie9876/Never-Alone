@@ -83,10 +83,52 @@ Never Alone is a **multilingual, voice-based AI companion** that talks, listens,
 
 ## 🚀 Current Status
 
-**Phase:** Concept & Planning  
+**Phase:** Active Development (Week 1 - Backend Foundation)  
 **Next Milestone:** MVP Prototype (90-day plan)
 
+### ✅ Completed
+- Week 1 Foundation: NestJS backend, Azure configuration, Memory service, Audio generation
+
+### 🔨 In Progress
+- Backend REST API testing
+- Azure infrastructure deployment
+
 See [MVP Roadmap](./docs/planning/mvp-roadmap.md) for detailed timeline.
+
+---
+
+## 🛠️ Quick Start (Development)
+
+### Backend Setup
+
+```bash
+# Navigate to backend directory
+cd backend
+
+# Install dependencies
+npm install
+
+# Configure environment variables
+cp .env.example .env
+# Edit .env with your Azure credentials
+
+# Create Cosmos DB containers (see backend/README.md)
+
+# Generate audio files
+npm run generate-audio
+
+# Start development server
+npm run start:dev
+```
+
+See [backend/README.md](./backend/README.md) for detailed setup instructions.
+
+### Documentation
+
+For developers starting work on this project:
+1. Read [GETTING_STARTED.md](./docs/technical/GETTING_STARTED.md) first
+2. Review [IMPLEMENTATION_TASKS.md](./docs/technical/IMPLEMENTATION_TASKS.md) for task list
+3. Check [MVP Simplifications](./docs/technical/mvp-simplifications.md) to understand scope
 
 ---
 

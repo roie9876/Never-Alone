@@ -1,0 +1,38 @@
+# OS
+.DS_Store
+Thumbs.db
+*~
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Audio files (generated)
+*.mp3
+*.wav
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Azure credentials
+azure-credentials.json

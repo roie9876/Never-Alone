@@ -1,0 +1,565 @@
+/**
+ * Realtime API Service
+ * Manages WebSocket connections to Azure OpenAI Realtime API
+ * Handles audio streaming, transcript logging, and function calling
+ *
+ * Reference: docs/technical/realtime-api-integration.md
+ */
+
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { DefaultAzureCredential } from '@azure/identity';
+import { AzureConfigService } from '@config/azure.config';
+import { MemoryService } from './memory.service';
+import {
+  RealtimeSession,
+  RealtimeSessionConfig,
+  TranscriptEvent,
+  SystemPromptContext,
+} from '@interfaces/realtime.interface';
+import { ConversationTurn } from '@interfaces/memory.interface';
+import { v4 as uuidv4 } from 'uuid';
+import * as WebSocket from 'ws';
+
+@Injectable()
+export class RealtimeService {
+  private readonly logger = new Logger(RealtimeService.name);
+  private activeSessions: Map<string, RealtimeSession> = new Map();
+  private sessionWebSockets: Map<string, WebSocket> = new Map();
+
+  constructor(
+    private configService: ConfigService,
+    private azureConfig: AzureConfigService,
+    private memoryService: MemoryService,
+  ) {}
+
+  /**
+   * Create a new Realtime API session with memory injection
+   */
+  async createSession(config: RealtimeSessionConfig): Promise<RealtimeSession> {
+    this.logger.log(`Creating Realtime session for user: ${config.userId}`);
+
+    // 1. Load all memory tiers
+    const memories = await this.memoryService.loadMemory(config.userId);
+
+    // 2. Load user profile and safety config
+    const userProfile = await this.loadUserProfile(config.userId);
+    const safetyConfig = await this.loadSafetyConfig(config.userId);
+
+    // 3. Build system prompt with context
+    const systemPrompt = this.buildSystemPrompt({
+      userName: userProfile?.name || 'User',
+      userAge: userProfile?.age || 70,
+      language: config.language || 'he',
+      cognitiveMode: userProfile?.cognitiveMode || 'standard',
+      familyMembers: userProfile?.familyMembers || [],
+      safetyRules: safetyConfig,
+      memories,
+    });
+
+    // 4. Create session object
+    const session: RealtimeSession = {
+      id: uuidv4(),
+      userId: config.userId,
+      conversationId: uuidv4(),
+      startedAt: new Date().toISOString(),
+      status: 'active',
+      turnCount: 0,
+      tokenUsage: 0,
+    };
+
+    this.activeSessions.set(session.id, session);
+
+    // 5. Create WebSocket connection to Azure OpenAI
+    await this.initializeWebSocket(session, systemPrompt, config);
+
+    this.logger.log(`Session created: ${session.id}`);
+    return session;
+  }
+
+  /**
+   * Initialize WebSocket connection to Azure OpenAI Realtime API
+   */
+  private async initializeWebSocket(
+    session: RealtimeSession,
+    systemPrompt: string,
+    config: RealtimeSessionConfig,
+  ): Promise<void> {
+    const endpoint = this.configService.get<string>('AZURE_OPENAI_ENDPOINT');
+    const deployment = this.configService.get<string>('AZURE_OPENAI_DEPLOYMENT');
+    const apiVersion = this.configService.get<string>('AZURE_OPENAI_API_VERSION');
+
+    // Get Azure AD token
+    const credential = new DefaultAzureCredential();
+    const tokenResponse = await credential.getToken('https://cognitiveservices.azure.com/.default');
+    const token = tokenResponse.token;
+
+    // WebSocket URL for Realtime API
+    const wsUrl = `${endpoint}/openai/realtime?api-version=${apiVersion}&deployment=${deployment}`;
+
+    this.logger.debug(`Connecting to: ${wsUrl}`);
+
+    const ws = new WebSocket(wsUrl, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    // Store WebSocket reference
+    this.sessionWebSockets.set(session.id, ws);
+
+    ws.on('open', () => {
+      this.logger.log(`WebSocket connected for session: ${session.id}`);
+
+      // Send session configuration
+      ws.send(JSON.stringify({
+        type: 'session.update',
+        session: {
+          modalities: ['text', 'audio'],
+          instructions: systemPrompt,
+          voice: config.voice || 'alloy',
+          input_audio_format: 'pcm16',
+          output_audio_format: 'pcm16',
+          input_audio_transcription: {
+            model: 'whisper-1',
+          },
+          turn_detection: {
+            type: 'server_vad',
+            threshold: 0.5,
+            prefix_padding_ms: 300,
+            silence_duration_ms: 500,
+          },
+          tools: this.getFunctionTools(),
+          temperature: 0.8,
+          max_response_output_tokens: 4096,
+        },
+      }));
+    });
+
+    ws.on('message', async (data: WebSocket.Data) => {
+      try {
+        const event = JSON.parse(data.toString());
+        await this.handleRealtimeEvent(session, event);
+      } catch (error) {
+        this.logger.error(`Failed to handle WebSocket message: ${error.message}`);
+      }
+    });
+
+    ws.on('error', (error) => {
+      this.logger.error(`WebSocket error for session ${session.id}: ${error.message}`);
+      session.status = 'error';
+    });
+
+    ws.on('close', () => {
+      this.logger.log(`WebSocket closed for session: ${session.id}`);
+      session.status = 'ended';
+      this.sessionWebSockets.delete(session.id);
+    });
+  }
+
+  /**
+   * Handle events from Azure OpenAI Realtime API
+   */
+  private async handleRealtimeEvent(session: RealtimeSession, event: any): Promise<void> {
+    switch (event.type) {
+      case 'session.created':
+        this.logger.log(`Realtime session created: ${event.session.id}`);
+        break;
+
+      case 'session.updated':
+        this.logger.debug('Session configuration updated');
+        break;
+
+      case 'conversation.item.input_audio_transcription.completed':
+        // User spoke - transcript ready
+        await this.handleUserTranscript(session, event);
+        break;
+
+      case 'response.audio_transcript.done':
+        // AI response complete - transcript ready
+        await this.handleAITranscript(session, event);
+        break;
+
+      case 'response.function_call_arguments.done':
+        // AI called a function
+        await this.handleFunctionCall(session, event);
+        break;
+
+      case 'response.done':
+        this.logger.debug(`Response complete for session: ${session.id}`);
+        break;
+
+      case 'error':
+        this.logger.error(`Realtime API error: ${JSON.stringify(event.error)}`);
+        break;
+
+      default:
+        // Ignore other events for MVP
+        break;
+    }
+  }
+
+  /**
+   * Handle user transcript (voice input)
+   */
+  private async handleUserTranscript(session: RealtimeSession, event: any): Promise<void> {
+    const turn: ConversationTurn = {
+      role: 'user',
+      timestamp: new Date().toISOString(),
+      transcript: event.transcript,
+    };
+
+    // Save to short-term memory
+    await this.memoryService.addShortTermTurn(session.userId, turn);
+
+    // Save to Cosmos DB (conversations container)
+    await this.saveConversationTurn(session, turn);
+
+    session.turnCount++;
+    this.logger.debug(`User transcript: "${event.transcript.substring(0, 50)}..."`);
+  }
+
+  /**
+   * Handle AI transcript (voice output)
+   */
+  private async handleAITranscript(session: RealtimeSession, event: any): Promise<void> {
+    const turn: ConversationTurn = {
+      role: 'assistant',
+      timestamp: new Date().toISOString(),
+      transcript: event.transcript,
+    };
+
+    // Save to short-term memory
+    await this.memoryService.addShortTermTurn(session.userId, turn);
+
+    // Save to Cosmos DB
+    await this.saveConversationTurn(session, turn);
+
+    session.turnCount++;
+    this.logger.debug(`AI transcript: "${event.transcript.substring(0, 50)}..."`);
+  }
+
+  /**
+   * Handle function calls from AI
+   */
+  private async handleFunctionCall(session: RealtimeSession, event: any): Promise<void> {
+    const functionName = event.name;
+    const args = JSON.parse(event.arguments);
+
+    this.logger.log(`Function called: ${functionName}`);
+
+    let result: any;
+
+    try {
+      if (functionName === 'extract_important_memory') {
+        // Save memory to long-term storage
+        const memory = await this.memoryService.saveLongTermMemory(session.userId, args);
+        result = { success: true, memoryId: memory.id };
+      } else if (functionName === 'trigger_family_alert') {
+        // TODO: Implement family alert (Week 4)
+        result = { success: true, message: 'Alert sent to family' };
+        this.logger.warn(`Safety alert triggered: ${args.safety_rule_violated}`);
+      } else {
+        result = { success: false, error: 'Unknown function' };
+      }
+
+      // Send function result back to Realtime API
+      const ws = this.sessionWebSockets.get(session.id);
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'conversation.item.create',
+          item: {
+            type: 'function_call_output',
+            call_id: event.call_id,
+            output: JSON.stringify(result),
+          },
+        }));
+      }
+    } catch (error) {
+      this.logger.error(`Function call failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Save conversation turn to Cosmos DB
+   */
+  private async saveConversationTurn(session: RealtimeSession, turn: ConversationTurn): Promise<void> {
+    try {
+      // Query for existing conversation document
+      const query = `
+        SELECT * FROM c
+        WHERE c.conversationId = @conversationId
+          AND c.userId = @userId
+      `;
+
+      const { resources } = await this.azureConfig.conversationsContainer.items
+        .query({
+          query,
+          parameters: [
+            { name: '@conversationId', value: session.conversationId },
+            { name: '@userId', value: session.userId },
+          ],
+        })
+        .fetchAll();
+
+      if (resources.length > 0) {
+        // Update existing conversation
+        const conversation = resources[0];
+        conversation.turns.push(turn);
+        conversation.endTime = new Date().toISOString();
+        conversation.totalTurns = conversation.turns.length;
+
+        await this.azureConfig.conversationsContainer
+          .item(conversation.id, session.userId)
+          .replace(conversation);
+      } else {
+        // Create new conversation document
+        const conversation = {
+          id: uuidv4(),
+          userId: session.userId,
+          conversationId: session.conversationId,
+          sessionId: session.id,
+          type: 'conversation',
+          startTime: session.startedAt,
+          endTime: new Date().toISOString(),
+          turns: [turn],
+          totalTurns: 1,
+          tokenUsage: session.tokenUsage,
+        };
+
+        await this.azureConfig.conversationsContainer.items.create(conversation);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to save conversation turn: ${error.message}`);
+    }
+  }
+
+  /**
+   * Build system prompt with user context and memories
+   */
+  private buildSystemPrompt(context: SystemPromptContext): string {
+    const { userName, userAge, language, cognitiveMode, familyMembers, memories } = context;
+
+    // Format memories for prompt
+    const shortTermFormatted = memories.shortTerm
+      .map((turn) => `${turn.role}: ${turn.transcript}`)
+      .join('\n');
+
+    const longTermFormatted = memories.longTerm
+      .map((mem) => `- ${mem.value}`)
+      .join('\n');
+
+    return `You are a warm, empathetic AI companion for elderly users.
+
+# USER CONTEXT
+Name: ${userName}
+Age: ${userAge}
+Language: ${language === 'he' ? 'Hebrew' : 'English'} (respond in this language)
+Mode: ${cognitiveMode}
+Current time: ${new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })}
+
+# FAMILY MEMBERS
+${familyMembers.map((fm) => `- ${fm.name} (${fm.relationship})`).join('\n')}
+
+# RECENT CONVERSATION (Last 10 turns)
+${shortTermFormatted || 'No recent conversation'}
+
+# IMPORTANT MEMORIES
+${longTermFormatted || 'No memories yet'}
+
+# YOUR ROLE
+- Provide companionship and conversation
+- Be patient with repetition - memory issues are expected
+- Speak in ${language === 'he' ? 'Hebrew' : 'English'}
+- Keep responses SHORT (2-3 sentences maximum)
+- When user mentions NEW important information (family, preferences, health), call extract_important_memory()
+
+# SAFETY RULES
+${context.safetyRules ? this.formatSafetyRules(context.safetyRules) : 'No safety rules configured yet'}
+
+# MEMORY EXTRACTION
+When you learn NEW important facts about ${userName}, call extract_important_memory() with:
+- memory_type: "family_info", "preference", "health", or "routine"
+- key: short identifier (e.g., "daughter_name")
+- value: the actual information (e.g., "Sarah")
+- context: how you learned this
+- importance: "high", "medium", or "low"
+
+Always be warm, patient, and emotionally present.`;
+  }
+
+  /**
+   * Format safety rules for system prompt
+   */
+  private formatSafetyRules(safetyConfig: any): string {
+    if (!safetyConfig) return 'No safety rules configured';
+
+    const rules: string[] = [];
+
+    if (safetyConfig.neverAllow?.length > 0) {
+      rules.push('NEVER allow or encourage:');
+      safetyConfig.neverAllow.forEach((rule: any) => {
+        rules.push(`- ${rule.rule}: ${rule.reason}`);
+      });
+    }
+
+    if (safetyConfig.crisisTriggers?.length > 0) {
+      rules.push('\nALERT IMMEDIATELY if user mentions:');
+      safetyConfig.crisisTriggers.forEach((trigger: string) => {
+        rules.push(`- "${trigger}"`);
+      });
+    }
+
+    return rules.join('\n');
+  }
+
+  /**
+   * Get function definitions for Realtime API
+   */
+  private getFunctionTools(): any[] {
+    return [
+      {
+        type: 'function',
+        name: 'extract_important_memory',
+        description: 'Save important facts mentioned by the user to long-term memory',
+        parameters: {
+          type: 'object',
+          properties: {
+            memory_type: {
+              type: 'string',
+              enum: ['family_info', 'preference', 'health', 'routine'],
+              description: 'Category of memory',
+            },
+            key: {
+              type: 'string',
+              description: 'Short identifier (e.g., "granddaughter_name")',
+            },
+            value: {
+              type: 'string',
+              description: 'The actual memory content',
+            },
+            context: {
+              type: 'string',
+              description: 'How this was learned',
+            },
+            importance: {
+              type: 'string',
+              enum: ['high', 'medium', 'low'],
+              description: 'Importance level',
+            },
+          },
+          required: ['memory_type', 'key', 'value', 'importance'],
+        },
+      },
+      {
+        type: 'function',
+        name: 'trigger_family_alert',
+        description: 'Alert family members when user requests unsafe activity or expresses crisis',
+        parameters: {
+          type: 'object',
+          properties: {
+            severity: {
+              type: 'string',
+              enum: ['critical', 'high', 'medium'],
+              description: 'Alert priority level',
+            },
+            user_request: {
+              type: 'string',
+              description: 'What the user said or requested',
+            },
+            safety_rule_violated: {
+              type: 'string',
+              description: 'Which safety rule was triggered',
+            },
+          },
+          required: ['severity', 'user_request', 'safety_rule_violated'],
+        },
+      },
+    ];
+  }
+
+  /**
+   * Load user profile (stub for MVP - will load from Cosmos DB later)
+   */
+  private async loadUserProfile(userId: string): Promise<any> {
+    try {
+      const { resource } = await this.azureConfig.usersContainer.item(userId, userId).read();
+      return resource;
+    } catch (error) {
+      this.logger.warn(`User profile not found for ${userId}, using defaults`);
+      return null;
+    }
+  }
+
+  /**
+   * Load safety config (stub for MVP)
+   */
+  private async loadSafetyConfig(userId: string): Promise<any> {
+    try {
+      const { resource } = await this.azureConfig.safetyConfigContainer.item(userId, userId).read();
+      return resource;
+    } catch (error) {
+      this.logger.warn(`Safety config not found for ${userId}`);
+      return null;
+    }
+  }
+
+  /**
+   * Get active session by ID
+   */
+  getSession(sessionId: string): RealtimeSession | undefined {
+    return this.activeSessions.get(sessionId);
+  }
+
+  /**
+   * End a Realtime session
+   */
+  async endSession(sessionId: string): Promise<void> {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+
+    // Close WebSocket
+    const ws = this.sessionWebSockets.get(sessionId);
+    if (ws) {
+      ws.close();
+      this.sessionWebSockets.delete(sessionId);
+    }
+
+    session.status = 'ended';
+    this.activeSessions.delete(sessionId);
+
+    this.logger.log(`Session ended: ${sessionId} (${session.turnCount} turns)`);
+  }
+
+  /**
+   * Send audio chunk to Realtime API
+   */
+  async sendAudioChunk(sessionId: string, audioBase64: string): Promise<void> {
+    const ws = this.sessionWebSockets.get(sessionId);
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket not connected');
+    }
+
+    ws.send(JSON.stringify({
+      type: 'input_audio_buffer.append',
+      audio: audioBase64,
+    }));
+  }
+
+  /**
+   * Commit audio buffer (signal end of user speech)
+   */
+  async commitAudioBuffer(sessionId: string): Promise<void> {
+    const ws = this.sessionWebSockets.get(sessionId);
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket not connected');
+    }
+
+    ws.send(JSON.stringify({
+      type: 'input_audio_buffer.commit',
+    }));
+  }
+}
