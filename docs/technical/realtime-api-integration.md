@@ -165,6 +165,31 @@ const session = await azureOpenAI.beta.realtime.sessions.create({
         },
         required: ["memory_type", "key", "value"]
       }
+    },
+    {
+      type: "function",
+      name: "play_music",
+      description: "Play a song for the user from their preferred music library (optional feature)",
+      parameters: {
+        type: "object",
+        properties: {
+          song_identifier: {
+            type: "string",
+            description: "Song name, artist name, or genre to play (e.g., 'ירושלים של זהב', 'Naomi Shemer', 'Israeli classics')"
+          },
+          reason: {
+            type: "string",
+            enum: ["user_requested", "sadness_detected", "celebration", "therapeutic"],
+            description: "Why are we playing music now?"
+          },
+          search_type: {
+            type: "string",
+            enum: ["specific_song", "artist", "genre"],
+            description: "How to search for music"
+          }
+        },
+        required: ["song_identifier", "reason", "search_type"]
+      }
     }
   ],
   
@@ -320,6 +345,84 @@ ws.on('response.function_call_arguments.done', async (event) => {
         type: "function_call_output",
         call_id: event.call_id,
         output: JSON.stringify({ status: "memory_saved" })
+      }
+    }));
+  }
+  
+  else if (functionName === "play_music") {
+    // Optional feature: Play music via YouTube Music
+    const { song_identifier, reason, search_type } = args;
+    
+    // 1. Check if user has music enabled
+    const musicPrefs = await loadMusicPreferences(userId);
+    if (!musicPrefs || !musicPrefs.enabled) {
+      // Music not configured - gracefully decline
+      ws.send(JSON.stringify({
+        type: "conversation.item.create",
+        item: {
+          type: "function_call_output",
+          call_id: event.call_id,
+          output: JSON.stringify({ 
+            status: "music_disabled",
+            message: "Music is not configured for this user"
+          })
+        }
+      }));
+      return;
+    }
+    
+    // 2. Search YouTube Music API
+    const searchQuery = buildSearchQuery(song_identifier, search_type, musicPrefs);
+    const youtubeVideo = await searchYouTubeMusic(searchQuery);
+    
+    if (!youtubeVideo) {
+      // Song not found - let AI know
+      ws.send(JSON.stringify({
+        type: "conversation.item.create",
+        item: {
+          type: "function_call_output",
+          call_id: event.call_id,
+          output: JSON.stringify({ 
+            status: "not_found",
+            message: `Could not find "${song_identifier}"`
+          })
+        }
+      }));
+      return;
+    }
+    
+    // 3. Send playback command to tablet via WebSocket
+    await tabletWs.send(JSON.stringify({
+      type: "play_music",
+      videoId: youtubeVideo.id,
+      title: youtubeVideo.title,
+      artist: youtubeVideo.artist || "Unknown",
+      reason: reason
+    }));
+    
+    // 4. Log playback history to Cosmos DB
+    await savePlaybackHistory({
+      userId,
+      conversationId,
+      songName: youtubeVideo.title,
+      artistName: youtubeVideo.artist,
+      youtubeVideoId: youtubeVideo.id,
+      playedAt: new Date().toISOString(),
+      triggeredBy: reason,
+      conversationContext: getCurrentConversationContext()
+    });
+    
+    // 5. Return success to AI
+    ws.send(JSON.stringify({
+      type: "conversation.item.create",
+      item: {
+        type: "function_call_output",
+        call_id: event.call_id,
+        output: JSON.stringify({ 
+          status: "playing",
+          song: youtubeVideo.title,
+          artist: youtubeVideo.artist
+        })
       }
     }));
   }

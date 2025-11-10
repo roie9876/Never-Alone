@@ -671,6 +671,91 @@ interface SafetyConfig {
 
 ---
 
+### 🔹 Task 5.4: Music Integration - Backend (NEW)
+**Owner:** Backend Engineer  
+**Time:** 6-8 hours  
+**Priority:** P2 (Optional feature)  
+**Dependencies:** Task 2.1
+
+**What to build:**
+1. Create `MusicService` class
+2. Implement YouTube Data API integration:
+   - Search for songs by name/artist/genre
+   - Return video ID + metadata
+3. Add `play_music()` function to Realtime API tools
+4. Create Cosmos DB container: `user-music-preferences`
+5. Create Cosmos DB container: `music-playback-history` (90-day TTL)
+6. Handle Hebrew song names correctly
+
+**Acceptance criteria:**
+- ✅ Can search YouTube Music and return video ID
+- ✅ Function call `play_music()` returns playback URL
+- ✅ Music preferences saved to Cosmos DB
+- ✅ Hebrew song search works (e.g., "ירושלים של זהב")
+- ✅ Playback history logged
+
+**Reference:** [music-integration.md](./music-integration.md)
+
+---
+
+### 🔹 Task 5.5: Music Integration - Onboarding Form (NEW)
+**Owner:** Frontend Engineer  
+**Time:** 4-6 hours  
+**Priority:** P2 (Optional feature)  
+**Dependencies:** Task 4.1
+
+**What to build:**
+1. Add optional Step 8 to onboarding form: "Music Preferences"
+2. Form fields:
+   - Enable/disable music checkbox
+   - Preferred artists (comma-separated)
+   - Preferred songs (comma-separated)
+   - Music genres
+   - Allow auto-play checkbox
+   - Play on sadness checkbox
+   - Max songs per session (1-5)
+3. Save preferences to Cosmos DB
+4. Validation: at least 1 artist or song if enabled
+
+**Acceptance criteria:**
+- ✅ Step 8 appears as optional in onboarding flow
+- ✅ Can skip music configuration entirely
+- ✅ Form validates input (comma-separated lists)
+- ✅ Preferences saved correctly to Cosmos DB
+- ✅ Can edit preferences later
+
+**Reference:** [music-integration.md](./music-integration.md), [onboarding-flow.md](../planning/onboarding-flow.md)
+
+---
+
+### 🔹 Task 5.6: Music Integration - Flutter Player (NEW)
+**Owner:** Frontend Engineer  
+**Time:** 6-8 hours  
+**Priority:** P2 (Optional feature)  
+**Dependencies:** Task 5.2, Task 5.4
+
+**What to build:**
+1. Add `youtube_player_flutter` package
+2. Create `MusicPlayerOverlay` widget:
+   - YouTube video player (audio-only mode preferred)
+   - Song title + artist display
+   - Large control buttons (play, pause, stop)
+   - Hebrew labels
+3. Handle WebSocket event: `play_music`
+4. Show overlay when music plays
+5. Track playback duration (send to backend)
+
+**Acceptance criteria:**
+- ✅ YouTube video plays when triggered
+- ✅ Controls are large and accessible
+- ✅ Can pause/resume/stop music
+- ✅ Hebrew labels correct ("עצור", "השהה", "נגן")
+- ✅ Playback duration tracked and logged
+
+**Reference:** [music-integration.md](./music-integration.md)
+
+---
+
 ## 📅 Week 7-8: Testing + Polish
 
 ### 🔹 Task 7.1: Manual Testing Scenarios
@@ -791,11 +876,11 @@ interface SafetyConfig {
 **By priority:**
 - **P0 (Critical):** 16 tasks, ~120 hours
 - **P1 (Important):** 8 tasks, ~50 hours
-- **P2 (Nice-to-have):** Deferred post-MVP
+- **P2 (Optional - Nice-to-have):** 3 tasks (music integration), ~16-22 hours
 
 **By role:**
-- **Backend Engineer:** ~100 hours (Weeks 1-4)
-- **Frontend Engineer:** ~60 hours (Weeks 5-6)
+- **Backend Engineer:** ~106 hours (Weeks 1-4 + music backend)
+- **Frontend Engineer:** ~70 hours (Weeks 5-6 + music UI)
 - **DevOps:** ~20 hours (Week 1 + Week 7)
 - **QA/Testing:** ~15 hours (Week 7)
 

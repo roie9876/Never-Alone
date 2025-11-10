@@ -23,7 +23,7 @@ This document details the complete onboarding experience for Never Alone, from f
 └─────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────┐
-│  Phase 2: Patient Profile + Safety Configuration (7-10 min) │
+│  Phase 2: Patient Profile + Safety Configuration (8-12 min) │
 │  • Part 1: Basic Information                                │
 │  • Part 2: Medical Restrictions ⚠️ MANDATORY                │
 │  • Part 3: Physical Abilities                               │
@@ -31,6 +31,7 @@ This document details the complete onboarding experience for Never Alone, from f
 │  • Part 5: Never Allow Activities ⚠️ MANDATORY              │
 │  • Part 6: Special Situations                               │
 │  • Part 7: Emergency Contacts ⚠️ MANDATORY                  │
+│  • Part 8: Music Preferences 🎵 OPTIONAL (NEW)              │
 └─────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -127,11 +128,13 @@ Please click the link in the email to verify your account.
 ### Progress Indicator (Top of Every Screen)
 
 ```
-Step 1 of 7: Basic Information
-[■■□□□□□] 14% complete
+Step 1 of 8: Basic Information
+[■□□□□□□□] 12% complete
 
 [Save & Continue Later]  [Exit]
 ```
+
+**Note:** Step 8 (Music Preferences) is OPTIONAL and can be skipped.
 
 **Note:** All progress auto-saved. Users can exit anytime and resume later.
 
@@ -488,7 +491,95 @@ and used for all critical safety alerts.
 
 ---
 
-### Screen 2.8: Configuration Review
+### Part 8: Music Preferences (OPTIONAL - NEW) 🎵 (Screen 2.8)
+
+**Header:**
+```
+🎵 Music Preferences (Optional)
+
+Music therapy can help improve mood, reduce anxiety, and trigger positive 
+memories. Configure music preferences to allow the AI to play familiar songs.
+
+[Skip this step - I'll add music later] →
+```
+
+**Why This Matters:**
+> 💡 Research shows that familiar music can:
+> - Reduce anxiety and agitation by 50-70%
+> - Trigger memories from youth (especially ages 10-30)
+> - Improve engagement and mood
+> - Provide comfort during difficult moments
+
+**Form Fields:**
+
+**8.1 Enable Music:**
+```
+☐ Yes, enable music playback during conversations
+```
+
+**If enabled, show:**
+
+**8.2 Preferred Artists** (comma-separated):
+```
+Examples: Naomi Shemer, Arik Einstein, Shalom Hanoch, The Beatles
+──────────────────────────────────────────────────
+Help text: "List artists תפארת loves. Separate with commas."
+```
+
+**8.3 Preferred Songs** (comma-separated):
+```
+Examples: ירושלים של זהב, אני ואתה, יושב על הגדר
+──────────────────────────────────────────────────
+Help text: "Favorite songs, especially from youth. Hebrew names supported."
+```
+
+**8.4 Music Genres:**
+```
+Examples: Israeli classics, 1960s Hebrew songs, classical music, folk
+──────────────────────────────────────────────────
+Help text: "Genres תפארת enjoys."
+```
+
+**8.5 AI Behavior Settings:**
+```
+☐ Allow AI to suggest music automatically (not just when asked)
+☐ Play calming music when תפארת seems sad or anxious
+```
+
+**8.6 Session Limits:**
+```
+Maximum songs per conversation: [3] (1-5)
+Help text: "Prevent overwhelming with too much music."
+```
+
+**Music Service (MVP):**
+```
+🎬 YouTube Music (Free tier - No subscription required)
+Post-MVP: Spotify Premium and Apple Music coming soon
+```
+
+**Validation:**
+- If music enabled, require at least 1 artist OR 1 song OR 1 genre
+- Max songs must be between 1-5
+
+**Save Behavior:**
+- Saved to Cosmos DB: `user-music-preferences` container
+- Can be edited later in family dashboard under "Music Settings"
+
+**Buttons:**
+- "Save Music Preferences →"
+- "Skip - I'll add this later →"
+
+**Design Notes:**
+- Visually distinct "OPTIONAL" badge
+- Skip button prominently displayed
+- No pressure to complete
+- Emphasize therapeutic benefits without overpromising
+- Make it clear YouTube Music is free (no hidden costs)
+
+---
+
+### Screen 2.9: Configuration Review
 
 **Header:**
 ```
@@ -544,6 +635,21 @@ from the family dashboard.
 - Secondary: David Cohen (Son) - If no response
 - Escalation: Call ambulance after 15 min
 [Edit]
+
+**Music Preferences (Optional):** 🎵
+- Status: Enabled ✅
+- Preferred Artists: Naomi Shemer, Arik Einstein, Shalom Hanoch (3 artists)
+- Preferred Songs: ירושלים של זהב, אני ואתה (5 songs)
+- Genres: Israeli classics, 1960s Hebrew songs
+- Auto-play: Yes, Max 3 songs/session
+- Play on sadness: Enabled
+[Edit]
+
+_OR if skipped:_
+
+**Music Preferences (Optional):** 🎵
+- Status: Not configured (can be added later)
+[Set up now]
 
 **Buttons:**
 - "Confirm & Continue to Patient Consent →"

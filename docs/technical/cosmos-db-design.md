@@ -492,6 +492,73 @@ Never Alone uses **Azure Cosmos DB** as its primary database for storing user da
 
 ---
 
+### 7. User Music Preferences Container (NEW - Optional Feature) 🎵
+
+**Partition Key:** `/userId`  
+**Throughput:** 400 RU/s (shared with photos)  
+**TTL:** Off (permanent)
+
+**Document Structure:**
+```json
+{
+  "id": "music_pref_user_12345",
+  "userId": "user_12345",
+  "type": "user_music_preferences",
+  "enabled": true,
+  "preferredArtists": ["Naomi Shemer", "Arik Einstein", "Shalom Hanoch"],
+  "preferredSongs": ["ירושלים של זהב", "אני ואתה", "יושב על הגדר"],
+  "preferredGenres": ["Israeli classics", "1960s Hebrew songs", "folk"],
+  "musicService": "youtube-music",
+  "allowAutoPlay": true,
+  "playOnSadness": true,
+  "maxSongsPerSession": 3,
+  "createdAt": "2024-11-09T10:00:00Z",
+  "updatedAt": "2024-11-09T10:00:00Z",
+  "_ts": 1699524000
+}
+```
+
+**Usage:**
+- Created during onboarding (optional Step 8)
+- Loaded at session start to configure music availability
+- Can be edited later via family dashboard
+
+---
+
+### 8. Music Playback History Container (NEW - Optional Feature) 🎵
+
+**Partition Key:** `/userId`  
+**Throughput:** 400 RU/s (shared with photos)  
+**TTL:** 7776000 seconds (90 days)
+
+**Document Structure:**
+```json
+{
+  "id": "playback_xyz",
+  "userId": "user_12345",
+  "type": "music_playback",
+  "conversationId": "conv_abc",
+  "songName": "ירושלים של זהב",
+  "artistName": "Naomi Shemer",
+  "youtubeVideoId": "dQw4w9WgXcQ",
+  "playedAt": "2024-11-09T14:30:00Z",
+  "triggeredBy": "sadness_detected",
+  "conversationContext": "User mentioned feeling lonely after daughter's call",
+  "userLiked": true,
+  "playDuration": 180,
+  "ttl": 7776000,
+  "_ts": 1699524000
+}
+```
+
+**Usage:**
+- Logged every time music plays
+- Helps AI learn which songs work best
+- Family dashboard analytics (most played songs)
+- Auto-deleted after 90 days
+
+---
+
 ## Query Patterns
 
 ### Common Queries

@@ -16,6 +16,7 @@ Memory-enabled AI voice companion that helps elderly users (especially those wit
 - Medication reminders (pre-recorded audio + escalation)
 - Photo context triggering (show family photos during conversation)
 - Safety monitoring (crisis detection, emergency contacts)
+- Music playback (optional - YouTube Music integration)
 
 ---
 
@@ -336,6 +337,9 @@ BLOB_CONTAINER=audio-files
 
 **When integrating Realtime API:**
 - [docs/technical/realtime-api-integration.md](../docs/technical/realtime-api-integration.md)
+
+**When implementing music playback:**
+- [docs/technical/music-integration.md](../docs/technical/music-integration.md)
 
 **When questioning "should this be in MVP?":**
 - [docs/technical/mvp-simplifications.md](../docs/technical/mvp-simplifications.md)

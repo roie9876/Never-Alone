@@ -29,6 +29,7 @@ This repository contains comprehensive documentation for the Never Alone project
 - **[Realtime API Integration](./technical/realtime-api-integration.md)** — ⚡ Azure OpenAI Realtime API setup, transcript logging, memory extraction
 - **[Memory Architecture](./technical/memory-architecture.md)** — 🧠 Three-tier memory system (Redis + Cosmos DB), conversation continuity across sessions
 - **[Reminder System](./technical/reminder-system.md)** — 🔔 Medication reminders, daily check-ins, photo triggering (hybrid pre-recorded + Realtime API)
+- **[Music Integration](./technical/music-integration.md)** — 🎵 Optional music playback (YouTube Music API), therapeutic intervention
 - **[Cosmos DB Design](./technical/cosmos-db-design.md)** — Database schema, containers, indexing, TTL policies, cost analysis
 - **[AI Behavior](./technical/ai-behavior.md)** — Prompting, memory, emotion detection, safety
 - **[Challenges & Solutions](./technical/challenges-solutions.md)** — Technical problems and our approach
@@ -77,6 +78,7 @@ Never Alone/
 │   │   ├── realtime-api-integration.md
 │   │   ├── memory-architecture.md
 │   │   ├── reminder-system.md
+│   │   ├── music-integration.md (👈 NEW: Music playback feature)
 │   │   ├── cosmos-db-design.md
 │   │   ├── ai-behavior.md
 │   │   └── challenges-solutions.md
@@ -111,9 +113,10 @@ Never Alone/
 5. [Realtime API Integration](./technical/realtime-api-integration.md) ⚡ - WebSocket + function calling
 6. [Memory Architecture](./technical/memory-architecture.md) 🧠 - 3-tier memory system
 7. [Reminder System](./technical/reminder-system.md) 🔔 - Medication reminders + photo triggers
-8. [Cosmos DB Design](./technical/cosmos-db-design.md) - Database schemas
-9. [AI Behavior](./technical/ai-behavior.md) - Prompting & safety
-10. [Challenges & Solutions](./technical/challenges-solutions.md) - Known issues & fixes
+8. [Music Integration](./technical/music-integration.md) 🎵 - Optional music playback (YouTube Music)
+9. [Cosmos DB Design](./technical/cosmos-db-design.md) - Database schemas
+10. [AI Behavior](./technical/ai-behavior.md) - Prompting & safety
+11. [Challenges & Solutions](./technical/challenges-solutions.md) - Known issues & fixes
 
 **For GitHub Copilot:** See [.github/copilot-instructions.md](../.github/copilot-instructions.md)
 

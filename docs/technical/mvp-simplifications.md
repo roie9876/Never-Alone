@@ -430,6 +430,7 @@ TOTAL:                             ~$70-90/month
 5. **Three-tier memory system** - Short-term, working, long-term (simple keyword search)
 6. **Family dashboard** - Basic metrics and alerts
 7. **Safety configuration** - Onboarding form with patient-specific rules
+8. **Music playback (OPTIONAL)** - YouTube Music integration (free tier)
 
 ### What's Deferred 🚫
 
@@ -443,6 +444,9 @@ TOTAL:                             ~$70-90/month
 8. ❌ Emotion detection via prosody analysis
 9. ❌ Automatic memory summarization
 10. ❌ Multi-user permissions (beyond single admin)
+11. ❌ Spotify/Apple Music integration (YouTube Music only for MVP)
+12. ❌ Offline music playback (cached songs)
+13. ❌ AI-generated playlists
 
 ---
 
