@@ -36,3 +36,21 @@ build/
 
 # Azure credentials
 azure-credentials.json
+
+# Flutter/Dart specific
+frontend_flutter/.dart_tool/
+frontend_flutter/.flutter-plugins
+frontend_flutter/.flutter-plugins-dependencies
+frontend_flutter/.packages
+frontend_flutter/.pub-cache/
+frontend_flutter/.pub/
+frontend_flutter/build/
+frontend_flutter/coverage/
+frontend_flutter/ios/Flutter/.last_build_id
+frontend_flutter/macos/Flutter/ephemeral/
+frontend_flutter/macos/Flutter/Flutter-Generated.xcconfig
+frontend_flutter/macos/Flutter/GeneratedPluginRegistrant.swift
+
+# Flutter generated files
+frontend_flutter/**/*.g.dart
+frontend_flutter/**/*.freezed.dart
