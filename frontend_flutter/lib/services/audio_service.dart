@@ -1,15 +1,19 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:record/record.dart';
+import 'package:path_provider/path_provider.dart';
 
 /// Audio recording service for Realtime API
 /// 
-/// Handles microphone input with specific requirements:
+/// Uses file-based recording with polling due to macOS stream bug in record v6.0.0
+/// 
+/// Requirements:
 /// - Format: PCM16 (16-bit Linear PCM)
 /// - Sample Rate: 16kHz
 /// - Channels: Mono
-/// - Chunk size: ~100ms worth of audio
+/// - Chunk size: ~100ms worth of audio (3200 bytes)
 class AudioService extends ChangeNotifier {
   final AudioRecorder _recorder = AudioRecorder();
   
@@ -19,6 +23,11 @@ class AudioService extends ChangeNotifier {
   // Stream for audio chunks
   StreamController<Uint8List>? _audioStreamController;
   Stream<Uint8List>? _audioStream;
+  
+  // File-based capture
+  String? _tempFilePath;
+  int _lastReadPosition = 0;
+  Timer? _pollingTimer;
   
   // Getters
   bool get isRecording => _isRecording;
@@ -44,12 +53,10 @@ class AudioService extends ChangeNotifier {
     }
   }
   
-  /// Start recording audio
+  /// Start recording audio using file-based capture
   /// 
-  /// Configures recorder for Realtime API requirements:
-  /// - PCM16 format
-  /// - 16kHz sample rate
-  /// - Mono channel
+  /// NOTE: Using file recording + polling instead of streaming due to
+  /// macOS bug in record v6.0.0 where startStream() never emits data
   Future<void> startRecording() async {
     if (_isRecording) {
       debugPrint('AudioService: Already recording');
@@ -65,53 +72,75 @@ class AudioService extends ChangeNotifier {
     }
     
     try {
-      debugPrint('AudioService: Starting recording...');
+      debugPrint('AudioService: Starting file-based recording...');
       
       // Create stream controller for audio chunks
       _audioStreamController = StreamController<Uint8List>.broadcast();
       _audioStream = _audioStreamController!.stream;
       
+      // Get temporary directory for audio file
+      final tempDir = await getTemporaryDirectory();
+      _tempFilePath = '${tempDir.path}/audio_recording_${DateTime.now().millisecondsSinceEpoch}.pcm';
+      _lastReadPosition = 0;
+      
       // Configure for PCM16, 16kHz, mono
-    const config = RecordConfig(
-      encoder: AudioEncoder.pcm16bits,
-      sampleRate: 16000,
-      numChannels: 1,
-      bitRate: 256000,
-      echoCancel: true,       // Enable echo cancellation
-      autoGain: true,         // Enable automatic gain control
-      noiseSuppress: true,    // Enable noise suppression
-    );      // Start recording with stream
-      final stream = await _recorder.startStream(config);
+      const config = RecordConfig(
+        encoder: AudioEncoder.pcm16bits,
+        sampleRate: 16000,
+        numChannels: 1,
+        bitRate: 256000,
+        echoCancel: true,       // Enable echo cancellation
+        autoGain: true,         // Enable automatic gain control
+        noiseSuppress: true,    // Enable noise suppression
+      );
+      
+      // Start recording to file
+      await _recorder.start(config, path: _tempFilePath!);
       
       _isRecording = true;
       notifyListeners();
       
-      debugPrint('AudioService: Recording started successfully');
+      debugPrint('AudioService: ✅ Recording started to: $_tempFilePath');
       
-      // Listen to audio stream and forward to controller
-      stream.listen(
-        (data) {
-          if (_audioStreamController != null && !_audioStreamController!.isClosed) {
-            // Convert List<int> to Uint8List
-            final audioData = Uint8List.fromList(data);
-            _audioStreamController!.add(audioData);
-          }
-        },
-        onError: (error) {
-          debugPrint('AudioService: Stream error: $error');
-          stopRecording();
-        },
-        onDone: () {
-          debugPrint('AudioService: Stream done');
-          stopRecording();
-        },
-      );
+      // Start polling timer to read audio chunks from file
+      _pollingTimer = Timer.periodic(Duration(milliseconds: 100), (timer) async {
+        await _pollAudioFile();
+      });
+      
+      debugPrint('AudioService: ✅ Audio polling started (100ms intervals)');
       
     } catch (e) {
-      debugPrint('AudioService: Failed to start recording: $e');
+      debugPrint('AudioService: ❌ Failed to start recording: $e');
       _isRecording = false;
       notifyListeners();
       rethrow;
+    }
+  }
+  
+  /// Poll audio file for new data
+  Future<void> _pollAudioFile() async {
+    if (!_isRecording || _tempFilePath == null) return;
+    
+    try {
+      final file = File(_tempFilePath!);
+      if (!await file.exists()) return;
+      
+      // Read entire file
+      final allBytes = await file.readAsBytes();
+      
+      // Extract only NEW bytes since last read
+      if (allBytes.length > _lastReadPosition) {
+        final newBytes = allBytes.sublist(_lastReadPosition);
+        _lastReadPosition = allBytes.length;
+        
+        // Forward to stream
+        if (_audioStreamController != null && !_audioStreamController!.isClosed) {
+          _audioStreamController!.add(Uint8List.fromList(newBytes));
+          debugPrint('AudioService: 🎙️ Captured ${newBytes.length} bytes (total: ${allBytes.length})');
+        }
+      }
+    } catch (e) {
+      debugPrint('AudioService: ⚠️ Error polling audio file: $e');
     }
   }
   
@@ -125,6 +154,11 @@ class AudioService extends ChangeNotifier {
     try {
       debugPrint('AudioService: Stopping recording...');
       
+      // Cancel polling timer
+      _pollingTimer?.cancel();
+      _pollingTimer = null;
+      
+      // Stop recorder
       await _recorder.stop();
       
       // Close stream controller
@@ -134,12 +168,27 @@ class AudioService extends ChangeNotifier {
       _audioStreamController = null;
       _audioStream = null;
       
+      // Clean up temp file
+      if (_tempFilePath != null) {
+        try {
+          final file = File(_tempFilePath!);
+          if (await file.exists()) {
+            await file.delete();
+            debugPrint('AudioService: ✅ Temp file deleted: $_tempFilePath');
+          }
+        } catch (e) {
+          debugPrint('AudioService: ⚠️ Failed to delete temp file: $e');
+        }
+        _tempFilePath = null;
+        _lastReadPosition = 0;
+      }
+      
       _isRecording = false;
       notifyListeners();
       
-      debugPrint('AudioService: Recording stopped successfully');
+      debugPrint('AudioService: ✅ Recording stopped successfully');
     } catch (e) {
-      debugPrint('AudioService: Error stopping recording: $e');
+      debugPrint('AudioService: ❌ Error stopping recording: $e');
       _isRecording = false;
       notifyListeners();
     }

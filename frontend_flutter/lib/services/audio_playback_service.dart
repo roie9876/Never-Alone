@@ -15,6 +15,9 @@ class AudioPlaybackService extends ChangeNotifier {
   bool _isAccumulating = true;
   DateTime _lastChunkTime = DateTime.now();
   
+  // Callbacks
+  Function()? onPlaybackComplete;
+  
   // Getters
   bool get isPlaying => _isPlaying;
   int get queueSize => _audioChunks.length;
@@ -32,6 +35,9 @@ class AudioPlaybackService extends ChangeNotifier {
       // When playback completes, ready for next batch
       if (state == PlayerState.completed) {
         _isAccumulating = true;
+        
+        // Notify completion callback (to resume recording)
+        onPlaybackComplete?.call();
       }
     });
   }

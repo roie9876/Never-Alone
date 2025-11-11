@@ -46,6 +46,14 @@ class RealtimeConversationManager extends ChangeNotifier {
         _playbackService = playbackService {
     _setupCallbacks();
     _initializeConnection();
+    
+    // Set up playback completion callback to resume recording
+    _playbackService.onPlaybackComplete = () {
+      debugPrint('🔊 RealtimeConversationManager: AI playback complete, resuming recording');
+      if (_isConversationActive && !_audioService.isRecording) {
+        _audioService.resumeRecording();
+      }
+    };
   }
   
   /// Initialize WebSocket connection on startup
@@ -66,7 +74,13 @@ class RealtimeConversationManager extends ChangeNotifier {
     _websocketService.onAIAudioReceived = (audioBase64) {
       debugPrint('🔊 RealtimeConversationManager: Received AI audio chunk (${audioBase64.length} chars)');
       
-      // Play audio (don't pause recording for interruption support)
+      // PAUSE RECORDING while AI speaks to prevent echo/feedback loop
+      if (_audioService.isRecording) {
+        debugPrint('🔊 RealtimeConversationManager: Pausing recording to prevent echo');
+        _audioService.pauseRecording();
+      }
+      
+      // Play audio
       debugPrint('🔊 RealtimeConversationManager: Calling playback service...');
       _playbackService.playAudioBase64(audioBase64);
       debugPrint('🔊 RealtimeConversationManager: Playback service called');
