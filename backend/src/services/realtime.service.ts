@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { DefaultAzureCredential } from '@azure/identity';
 import { AzureConfigService } from '@config/azure.config';
 import { MemoryService } from './memory.service';
+import { PhotoService } from './photo.service';
 import {
   RealtimeSession,
   RealtimeSessionConfig,
@@ -18,6 +19,7 @@ import {
   SystemPromptContext,
 } from '@interfaces/realtime.interface';
 import { ConversationTurn } from '@interfaces/memory.interface';
+import { PhotoTriggerReason } from '@interfaces/photo.interface';
 import { v4 as uuidv4 } from 'uuid';
 import * as WebSocket from 'ws';
 
@@ -31,6 +33,7 @@ export class RealtimeService {
     private configService: ConfigService,
     private azureConfig: AzureConfigService,
     private memoryService: MemoryService,
+    private photoService: PhotoService,
   ) {}
 
   /**
@@ -260,6 +263,34 @@ export class RealtimeService {
         // TODO: Implement family alert (Week 4)
         result = { success: true, message: 'Alert sent to family' };
         this.logger.warn(`Safety alert triggered: ${args.safety_rule_violated}`);
+      } else if (functionName === 'show_photos') {
+        // Trigger photo display based on conversation context
+        const photoEvent = await this.photoService.triggerPhotoDisplay(
+          session.userId,
+          args.trigger_reason as PhotoTriggerReason,
+          args.mentioned_names,
+          args.keywords,
+          args.context,
+          args.emotional_state,
+        );
+
+        if (photoEvent) {
+          // TODO: Send to tablet via WebSocket (Week 5)
+          this.logger.log(`📸 Ready to display ${photoEvent.photos.length} photos`);
+          result = {
+            success: true,
+            photos_shown: photoEvent.photos.length,
+            photo_descriptions: photoEvent.photos.map((p) =>
+              `Photo of ${p.taggedPeople.join(', ')}${p.dateTaken ? ` taken on ${new Date(p.dateTaken).toLocaleDateString('he-IL')}` : ''}${p.location ? ` at ${p.location}` : ''}`,
+            ),
+          };
+        } else {
+          result = {
+            success: false,
+            reason: 'no_photos_available',
+            message: 'No photos match the criteria or all recent photos already shown',
+          };
+        }
       } else {
         result = { success: false, error: 'Unknown function' };
       }
@@ -474,6 +505,46 @@ Always be warm, patient, and emotionally present.`;
             },
           },
           required: ['severity', 'user_request', 'safety_rule_violated'],
+        },
+      },
+      {
+        type: 'function',
+        name: 'show_photos',
+        description: 'Show family photos to user when contextually appropriate during conversation. Use when user mentions family members, expresses sadness/loneliness, or explicitly requests photos.',
+        parameters: {
+          type: 'object',
+          properties: {
+            trigger_reason: {
+              type: 'string',
+              enum: [
+                'user_mentioned_family',
+                'user_expressed_sadness',
+                'long_conversation_engagement',
+                'user_requested_photos',
+              ],
+              description: 'Why are we showing photos now?',
+            },
+            mentioned_names: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Names of family members mentioned (e.g., ["Sarah", "מיכל"])',
+            },
+            keywords: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Keywords from conversation (e.g., ["family", "birthday", "trip"])',
+            },
+            context: {
+              type: 'string',
+              description: 'Brief explanation of conversation context',
+            },
+            emotional_state: {
+              type: 'string',
+              enum: ['neutral', 'sad', 'happy', 'confused', 'anxious'],
+              description: "User's current emotional state (if detectable)",
+            },
+          },
+          required: ['trigger_reason', 'context'],
         },
       },
     ];

@@ -8,8 +8,13 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { AzureConfigService } from './config/azure.config';
 import { MemoryService } from './services/memory.service';
 import { RealtimeService } from './services/realtime.service';
+import { ReminderService } from './services/reminder.service';
+import { PhotoService } from './services/photo.service';
+import { SafetyConfigService } from './services/safety-config.service';
 import { MemoryController } from './controllers/memory.controller';
 import { RealtimeController } from './controllers/realtime.controller';
+import { ReminderController } from './controllers/reminder.controller';
+import { PhotoController } from './controllers/photo.controller';
 import { HealthController } from './controllers/health.controller';
 import { RealtimeGateway } from './gateways/realtime.gateway';
 
@@ -25,11 +30,16 @@ import { RealtimeGateway } from './gateways/realtime.gateway';
     HealthController,
     MemoryController,
     RealtimeController,
+    ReminderController,
+    PhotoController,
   ],
   providers: [
     AzureConfigService,
     MemoryService,
     RealtimeService,
+    ReminderService,
+    PhotoService,
+    SafetyConfigService,
     RealtimeGateway,
   ],
 })

@@ -24,6 +24,8 @@ export interface ReminderMetadata {
   // For medication reminders
   medicationName?: string;
   dosage?: string;
+  specialInstructions?: string;
+  recurringDaily?: boolean; // Flag to indicate this is a daily recurring reminder
 
   // For appointments
   appointmentType?: string;

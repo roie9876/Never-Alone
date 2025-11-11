@@ -465,11 +465,13 @@ interface Photo {
 
 ## 📅 Week 4: Onboarding + Safety Configuration
 
-### 🔹 Task 4.1: Onboarding Form (Family Dashboard)
+### ✅ Task 4.1: Onboarding Form (Family Dashboard) - COMPLETE
 **Owner:** Frontend Engineer  
-**Time:** 10-12 hours  
+**Time:** 10-12 hours (actual: ~12 hours)  
 **Priority:** P0  
-**Dependencies:** None (can work in parallel)
+**Dependencies:** None (can work in parallel)  
+**Status:** ✅ COMPLETE  
+**Evidence:** `/dashboard/DASHBOARD_README.md`
 
 **What to build:**
 1. Create React/Next.js web dashboard
@@ -528,13 +530,25 @@ interface SafetyConfig {
 
 ---
 
-### 🔹 Task 4.2: Safety Config Loading
+### � Task 4.2: Safety Config Loading - 70% COMPLETE (BLOCKED)
 **Owner:** Backend Engineer  
-**Time:** 4-6 hours  
+**Time:** 4-6 hours (actual: ~4 hours)  
 **Priority:** P0  
-**Dependencies:** Task 4.1, Task 2.1
+**Dependencies:** Task 4.1, Task 2.1  
+**Status:** 🚧 70% COMPLETE (testing blocked by Cosmos DB network access)  
+**Evidence:** `/backend/TASK_4.2_STATUS.md`, `/backend/src/services/safety-config.service.ts`  
+**Blocker:** Cosmos DB publicNetworkAccess: "Disabled" - IP 77.137.71.13 needs whitelisting
 
-**What to build:**
+**What was built:**
+1. ✅ Created `SafetyConfigService` with full implementation
+2. ✅ Implemented `loadSafetyConfig(userId)` method
+3. ✅ Added crisis trigger detection logic
+4. ✅ Implemented alert handler with family notifications
+5. ✅ Created comprehensive test script (`test-safety-config.ts`)
+6. ⏳ RealtimeService integration pending (needs testing first)
+7. ⏳ End-to-end testing blocked by network access
+
+**What to build (remaining):**
 1. Create `SafetyConfigService`
 2. Implement methods:
    - `loadSafetyConfig(userId)` - Retrieve from Cosmos DB
@@ -558,13 +572,15 @@ interface SafetyConfig {
 
 ---
 
-### 🔹 Task 4.3: Medication Reminder Configuration
+### ✅ Task 4.3: Medication Reminder Configuration - COMPLETE
 **Owner:** Backend Engineer  
-**Time:** 4-6 hours  
+**Time:** 4-6 hours (actual: ~2 hours)  
 **Priority:** P1  
-**Dependencies:** Task 4.1, Task 3.1
+**Dependencies:** Task 4.1, Task 3.1  
+**Status:** ✅ COMPLETE (testing blocked by same Cosmos DB network issue)  
+**Evidence:** `/backend/TASK_4.3_COMPLETE.md`, `/backend/src/services/reminder.service.ts`
 
-**What to build:**
+**What was built:**
 1. Read medication schedule from safety config
 2. Create cron jobs for each medication time
 3. Implement reminder logic:

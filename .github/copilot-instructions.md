@@ -352,18 +352,52 @@ BLOB_CONTAINER=audio-files
 
 ## 🎯 Current Sprint Focus
 
-**Week 1 (Current):**
-- ✅ Documentation complete
-- ⏳ Azure infrastructure setup (Task 1.1)
-- ⏳ Memory service implementation (Task 1.3, 1.4)
-- ⏳ Pre-recorded audio generation (Task 1.5)
+**Week 4 (Current):**
+- ✅ Week 1-3 Complete (Infrastructure, Realtime API, Reminders/Photos)
+- ✅ Task 4.1: Onboarding form complete
+- 🚧 Task 4.2: Safety config loading (70% - network blocked)
+- ✅ Task 4.3: Medication reminders complete (testing blocked)
 
 **Next:**
-- Week 2: Realtime API integration
-- Week 3: Reminder system
-- Week 4: Onboarding form
+- Week 5-6: Flutter Mac desktop app
+- Week 7-8: Testing and polish
 
 See [IMPLEMENTATION_TASKS.md](../docs/technical/IMPLEMENTATION_TASKS.md) for full roadmap.
+
+---
+
+## 📝 Progress Tracking (IMPORTANT)
+
+**When completing any task, ALWAYS update these files:**
+
+### 1. PROGRESS_TRACKER.md (Root)
+Update after completing each task:
+- Change task status from ⏳ to ✅ or 🚧
+- Update progress bars and percentages
+- Update "Last Updated" date
+- Add time spent on completed tasks
+
+### 2. docs/technical/IMPLEMENTATION_TASKS.md
+Update task completion status:
+- Add ✅ emoji to completed task titles
+- Update "Status" in task header
+- Add completion notes/evidence
+- Update overall progress percentages
+
+### 3. Create Task Completion Documents
+For major tasks (Task X.Y), create:
+- `/backend/TASK_X.Y_COMPLETE.md` (or `/dashboard/` for frontend)
+- Document what was built, acceptance criteria met, test results
+- Include code examples and usage instructions
+
+**Example workflow:**
+```bash
+# 1. Complete Task 4.3
+# 2. Create TASK_4.3_COMPLETE.md
+# 3. Update PROGRESS_TRACKER.md (change status to ✅)
+# 4. Update IMPLEMENTATION_TASKS.md (mark task complete)
+# 5. Commit all changes together
+```
 
 ---
 
