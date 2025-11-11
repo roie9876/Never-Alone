@@ -301,7 +301,7 @@ export class RealtimeService {
 
         if (photoEvent && photoEvent.photos.length > 0) {
           this.logger.log(`📸 Displaying ${photoEvent.photos.length} photos via WebSocket`);
-          
+
           // Send photos to tablet via WebSocket gateway
           if (this.gateway) {
             this.gateway.broadcastPhotos(
@@ -317,7 +317,7 @@ export class RealtimeService {
               args.context,
             );
           }
-          
+
           result = {
             success: true,
             photos_shown: photoEvent.photos.length,
@@ -464,6 +464,22 @@ When you learn NEW important facts about ${userName}, call extract_important_mem
 - value: the actual information (e.g., "Sarah")
 - context: how you learned this
 - importance: "high", "medium", or "low"
+
+# PHOTO DISPLAY
+You can show family photos to ${userName} by calling show_photos() when:
+- User explicitly requests photos (e.g., "Show me photos", "תראה לי תמונות", "Can I see family photos?")
+- User mentions family members by name (e.g., "Tell me about Sarah", "שרה")
+- User expresses sadness or loneliness (e.g., "I feel lonely", "אני מרגיש בודד")
+- After a long engaging conversation (10+ minutes)
+
+When calling show_photos(), specify:
+- trigger_reason: Why you're showing photos (user_requested_photos, user_mentioned_family, user_expressed_sadness, long_conversation_engagement)
+- mentioned_names: Any family member names mentioned (e.g., ["Sarah", "מיכל"])
+- keywords: Relevant keywords from conversation (e.g., ["family", "birthday"])
+- context: Brief explanation of why this is a good moment
+- emotional_state: User's emotional state (happy, sad, neutral, anxious, confused)
+
+IMPORTANT: Always call show_photos() when the user asks to see photos - don't apologize that photos aren't available!
 
 Always be warm, patient, and emotionally present.`;
   }

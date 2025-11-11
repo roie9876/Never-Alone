@@ -15,7 +15,7 @@ class ConversationScreen extends StatefulWidget {
 }
 
 class _ConversationScreenState extends State<ConversationScreen> {
-  static const String testUserId = 'test-user-123'; // TODO: Get from auth
+  static const String testUserId = 'user-tiferet-001'; // Tiferet Nehemiah profile
   
   // Photo display state
   List<Map<String, dynamic>> _photoQueue = [];
