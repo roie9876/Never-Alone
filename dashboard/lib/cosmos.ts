@@ -1,14 +1,20 @@
 /**
  * Azure Cosmos DB client for dashboard
+ * Uses Azure AD authentication (DefaultAzureCredential)
  */
 
 import { CosmosClient } from '@azure/cosmos';
+import { DefaultAzureCredential } from '@azure/identity';
 import type { SafetyConfig } from '@/types/onboarding';
 
-// Initialize Cosmos DB client
-const cosmosClient = new CosmosClient(
-  process.env.COSMOS_CONNECTION_STRING || ''
-);
+// Initialize Cosmos DB client with Azure AD authentication
+const endpoint = process.env.COSMOS_ENDPOINT || 'https://neveralone.documents.azure.com:443/';
+const credential = new DefaultAzureCredential();
+
+const cosmosClient = new CosmosClient({
+  endpoint,
+  aadCredentials: credential
+});
 
 const database = cosmosClient.database(process.env.COSMOS_DATABASE || 'never-alone');
 

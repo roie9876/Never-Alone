@@ -7,7 +7,7 @@ import { z } from 'zod';
 // Emergency Contact Schema
 export const emergencyContactSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  phone: z.string().regex(/^\+?\d{10,15}$/, 'Invalid phone number format'),
+  phone: z.string().regex(/^\+972-\d{2}-\d{3}-\d{4}$/, 'מספר טלפון חייב להיות בפורמט: +972-50-123-4567'),
   relationship: z.string().min(2, 'Relationship must be specified'),
 });
 
@@ -28,6 +28,17 @@ export const routineSchema = z.object({
   sleepTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Time must be in HH:MM format'),
 });
 
+// Patient Background Story Schema
+export const patientBackgroundSchema = z.object({
+  fullName: z.string().min(2, 'שם מלא נדרש'),
+  age: z.number().min(1).max(120, 'גיל חייב להיות בין 1-120'),
+  medicalCondition: z.string().min(10, 'תיאור המצב הרפואי חייב להיות לפחות 10 תווים'),
+  personality: z.string().min(10, 'תיאור האישיות חייב להיות לפחות 10 תווים'),
+  hobbies: z.string().min(5, 'תחביבים - לפחות 5 תווים'),
+  familyContext: z.string().optional(),
+  importantMemories: z.string().optional(),
+});
+
 // Conversation Boundaries Schema
 export const boundariesSchema = z.object({
   forbiddenTopics: z.array(z.string()).min(0),
@@ -43,7 +54,8 @@ export const crisisTriggerSchema = z.object({
 
 // Complete Onboarding Form Schema
 export const onboardingFormSchema = z.object({
-  userId: z.string().uuid('Invalid user ID'),
+  userId: z.string().min(3, 'User ID must be at least 3 characters'),
+  patientBackground: patientBackgroundSchema, // NEW: סיפור רקע על המטופל
   emergencyContacts: z.array(emergencyContactSchema)
     .min(1, 'At least 1 emergency contact required')
     .max(3, 'Maximum 3 emergency contacts allowed'),

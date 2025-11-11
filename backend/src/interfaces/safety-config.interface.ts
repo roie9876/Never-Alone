@@ -51,11 +51,25 @@ export interface CrisisTrigger {
 }
 
 /**
+ * Patient Background Information
+ */
+export interface PatientBackground {
+  fullName: string;
+  age: number;
+  medicalCondition: string;
+  personality: string;
+  hobbies: string;
+  familyContext?: string;
+  importantMemories?: string;
+}
+
+/**
  * Complete Safety Configuration (from Cosmos DB)
  */
 export interface SafetyConfig {
   id: string;
   userId: string;
+  patientBackground: PatientBackground; // NEW: Patient background story
   emergencyContacts: EmergencyContact[];
   medications: Medication[];
   routines: DailyRoutine;

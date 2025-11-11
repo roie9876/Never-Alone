@@ -780,33 +780,49 @@ interface SafetyConfig {
 
 ## 📅 Week 7-8: Testing + Polish
 
-### 🔹 Task 7.1: Manual Testing Scenarios
+### ✅ Task 7.1: Manual Testing Scenarios - IN PROGRESS (15%)
 **Owner:** QA/Entire Team  
-**Time:** 10-15 hours  
+**Time:** 10-15 hours (2 hours spent on setup)  
 **Priority:** P0  
-**Dependencies:** All previous tasks
+**Dependencies:** All previous tasks  
+**Status:** 🚧 Testing framework complete, ready for execution
+
+**Setup Complete (Nov 11, 2025):**
+- ✅ Created TASK_7.1_TESTING_PLAN.md (5 detailed test scenarios)
+- ✅ Created run-all-tests.sh (automated pre-test system check) - verified working
+- ✅ Created TESTING_QUICK_START.md (3-day testing schedule)
+- ✅ Created verify-azure-ad.sh (Azure AD authentication verification) - all checks passed
+- ✅ Updated all scripts to use Azure AD authentication (no connection strings)
+- ✅ Updated copilot-instructions.md (Azure AD mandatory for all future scripts)
+- ✅ Deleted obsolete test-cosmos.js file (used old connection strings)
 
 **What to test:**
-1. **Memory continuity:**
+1. **Memory continuity:** ⏳ NOT STARTED
    - Day 1: User mentions "daughter Sarah" → Verify saved
    - Day 2: New session → AI references Sarah naturally
-2. **Medication reminders:**
+2. **Medication reminders:** ⏳ NOT STARTED
    - Schedule reminder for 5 min from now
    - Verify audio plays, confirmation works, snooze works
-3. **Crisis detection:**
+3. **Crisis detection:** ⏳ NOT STARTED
    - User says "I want to hurt myself" → Emergency contact notified
-4. **50-turn sliding window:**
+4. **50-turn sliding window:** ⏳ NOT STARTED
    - Have 100-turn conversation → Verify only last 50 in Redis
-5. **Photo triggering:**
+5. **Photo triggering:** ✅ VERIFIED WORKING (Task 5.3)
    - User mentions "family" → Photo shown
 
 **Acceptance criteria:**
-- ✅ All 5 scenarios pass manual testing
-- ✅ Bugs logged in GitHub Issues
-- ✅ Critical bugs fixed before launch
-- ✅ Performance metrics recorded (latency, memory usage)
+- ✅ Testing framework created
+- ✅ Pre-test system checks operational
+- ✅ Azure AD authentication verified across all code
+- ⏳ All 5 scenarios pass manual testing (4 remaining)
+- ⏳ Bugs logged in GitHub Issues
+- ⏳ Critical bugs fixed before launch
+- ⏳ Performance metrics recorded (latency, memory usage)
 
-**Reference:** [mvp-simplifications.md](./mvp-simplifications.md) - Testing Strategy
+**Reference:** 
+- TASK_7.1_TESTING_PLAN.md - Detailed test scenarios
+- TESTING_QUICK_START.md - 3-day testing schedule
+- backend/AZURE_AD_AUTHENTICATION_GUIDE.md - Security verification
 
 ---
 

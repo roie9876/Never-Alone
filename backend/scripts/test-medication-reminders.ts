@@ -15,6 +15,15 @@ const TEST_USER_ID = 'test-user-medication-reminders';
 const TEST_SAFETY_CONFIG: SafetyConfig = {
   id: `config_${Date.now()}`,
   userId: TEST_USER_ID,
+  patientBackground: {
+    fullName: 'Test Patient',
+    age: 80,
+    medicalCondition: 'Type 2 diabetes, hypertension',
+    personality: 'Friendly and cooperative',
+    hobbies: 'Reading, gardening',
+    familyContext: 'Lives with spouse, has 2 children',
+    importantMemories: 'Retired teacher, loves music',
+  },
   emergencyContacts: [
     {
       name: 'Dr. Sarah Cohen',

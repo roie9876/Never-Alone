@@ -48,6 +48,7 @@ export class SafetyConfigService {
       // Return most recent config
       const config = resources[0];
       this.logger.log(`✅ Loaded safety config for user: ${userId}`);
+      this.logger.log(`   - Patient: ${config.patientBackground?.fullName}, Age: ${config.patientBackground?.age}`);
       this.logger.log(`   - Emergency contacts: ${config.emergencyContacts.length}`);
       this.logger.log(`   - Medications: ${config.medications.length}`);
       this.logger.log(`   - Crisis triggers: ${config.crisisTriggers.length}`);
@@ -67,6 +68,36 @@ export class SafetyConfigService {
    * @returns Enhanced system prompt with safety rules
    */
   injectSafetyRules(basePrompt: string, config: SafetyConfig): string {
+    const patientBackgroundSection = config.patientBackground ? `
+
+═══════════════════════════════════════════════════════════
+👤 PATIENT BACKGROUND - WHO YOU'RE SPEAKING WITH
+═══════════════════════════════════════════════════════════
+
+## Patient Information
+- Name: ${config.patientBackground.fullName}
+- Age: ${config.patientBackground.age} years old
+- Medical Condition: ${config.patientBackground.medicalCondition}
+
+## Personality & Character
+${config.patientBackground.personality}
+
+## Hobbies & Interests
+${config.patientBackground.hobbies}
+
+${config.patientBackground.familyContext ? `## Family Context\n${config.patientBackground.familyContext}\n` : ''}
+${config.patientBackground.importantMemories ? `## Important Life Memories\n${config.patientBackground.importantMemories}\n` : ''}
+
+💡 USE THIS CONTEXT TO:
+- Address them by name naturally
+- Reference their hobbies in conversation ("How are your roses doing in the garden?")
+- Show empathy based on their medical condition
+- Connect with their personality (warm, storytelling, proud of family)
+- Reference their life history when relevant
+
+═══════════════════════════════════════════════════════════
+` : '';
+
     const safetySection = `
 
 ═══════════════════════════════════════════════════════════
@@ -134,7 +165,7 @@ END OF SAFETY RULES
 ═══════════════════════════════════════════════════════════
 `;
 
-    return basePrompt + safetySection;
+    return basePrompt + patientBackgroundSection + safetySection;
   }
 
   /**

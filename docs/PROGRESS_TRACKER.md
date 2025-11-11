@@ -13,7 +13,7 @@ Week 2 (Realtime API)       █████████████████�
 Week 3 (Reminders/Photos)   ████████████████████ 100% ✅
 Week 4 (Onboarding)         ████████████████████ 100% ✅
 Week 5-6 (Flutter)          ████████████████████ 100% ✅
-Week 7-8 (Testing/Polish)   ████████░░░░░░░░░░░░  40% 🚧
+Week 7-8 (Testing/Polish)   ██░░░░░░░░░░░░░░░░░░  10% 🚧
 ```
 
 ---
@@ -157,35 +157,22 @@ Week 7-8 (Testing/Polish)   ████████░░░░░░░░░�
 
 ---
 
-## Week 7-8: Testing + Polish (Current Sprint) - 15% Complete
+## 🚧 Week 7-8: Testing + Polish - IN PROGRESS
 
-**Status:** 🚧 IN PROGRESS (Started Nov 11, 2025)  
-**Goal:** Manual testing of all features, family dashboard MVP, cost monitoring  
-**Progress:** 1/7 tasks complete
-
-### Task 7.1: Manual Testing Scenarios ⏳ IN PROGRESS
-**Priority:** P0  
-**Time Estimate:** 10-15 hours (2.5 hours spent)  
-**Status:** 25% - Framework complete, Scenario 1 partially tested, memory limitation discovered  
-**Evidence:**
-- ✅ Created TASK_7.1_TESTING_PLAN.md (5 test scenarios)
-- ✅ Created run-all-tests.sh (automated pre-test checks) - UPDATED to Azure AD
-- ✅ Created TESTING_QUICK_START.md (3-day testing schedule)
-- ✅ Created verify-azure-ad.sh (Azure AD authentication verification)
-- ✅ Updated copilot-instructions.md (Azure AD mandatory pattern)
-- ✅ Verified all scripts use Azure AD (deleted obsolete test-cosmos.js)
-- ✅ Tested run-all-tests.sh - All systems operational
-- 🚧 Test Scenario 1: Memory Continuity (50% complete - Day 1 tested, limitation found)
-  - ✅ Memory extraction working (AI created memory for Racheli)
-  - ✅ Memory recall working (AI remembered in Session 2)
-  - ⚠️ **LIMITATION DISCOVERED**: No mechanism to UPDATE existing memories
-  - ⚠️ When user corrects AI mistakes, memory cannot be updated
-  - 📝 Created KNOWN_ISSUES.md to track all testing discoveries
-  - ⏳ Day 2 multi-day persistence testing pending
-- ⏳ Test Scenario 2: Medication Reminders (not started)
-- ⏳ Test Scenario 3: Crisis Detection (not started)
-- ✅ Test Scenario 4: Photo Triggering (verified working in Task 5.3)
-- ⏳ Test Scenario 5: 50-Turn Memory Window (not started)
+### Task 7.1: Manual Testing Scenarios ⏳
+- Status: **IN PROGRESS**
+- Started: November 11, 2025
+- Time estimate: 10-15 hours
+- Time spent: 1 hour (planning)
+- Evidence: `/TASK_7.1_TESTING_PLAN.md`
+- What's done:
+  1. ✅ Created comprehensive testing plan with 5 scenarios
+  2. ✅ Created automated pre-test system check script
+  3. ⏳ Test Scenario 1: Memory Continuity (NOT STARTED)
+  4. ⏳ Test Scenario 2: Medication Reminders (NOT STARTED)
+  5. ⏳ Test Scenario 3: Crisis Detection (NOT STARTED)
+  6. ✅ Test Scenario 4: Photo Triggering (PASSING - already verified)
+  7. ⏳ Test Scenario 5: 50-Turn Memory Window (NOT STARTED)
 
 ### Task 7.2: Family Dashboard MVP
 - Status: **NOT STARTED**
@@ -194,95 +181,6 @@ Week 7-8 (Testing/Polish)   ████████░░░░░░░░░�
 ### Task 7.3: Cost Monitoring & Optimization
 - Status: **NOT STARTED**
 - Time estimate: 4-6 hours
-
----
-
-## 🎯 NEW INITIATIVE: Onboarding System Enhancement (Started Nov 11, 2025)
-
-**Goal:** Transform single-family prototype → multi-family scalable platform  
-**Documentation:** `/ONBOARDING_ENHANCEMENT_PLAN.md`  
-**Timeline:** 4 weeks (Nov 11 - Dec 9, 2025)
-
-### Phase 0: Test Data Integration (Prerequisite) ✅ COMPLETE
-**Status:** ✅ COMPLETE (Nov 11, 2025)  
-**Time Spent:** 45 minutes  
-**Evidence:** `/dashboard/TEST_DATA_INTEGRATION_COMPLETE.md`
-
-**What Was Built:**
-1. ✅ Created `dashboard/lib/test-data.ts`
-   - TIFERET_TEST_DATA: Complete pre-filled onboarding data
-   - EMPTY_FORM_DATA: Blank form structure
-   - All crisis triggers properly formatted as objects
-
-2. ✅ Enhanced `OnboardingWizard.tsx`
-   - Added Testing Mode banner with toggle buttons
-   - "Load Tiferet Data" button (instant pre-fill)
-   - "Start Empty" button (reset to blank)
-   - Visual indicator showing active dataset
-   - `loadTestData()` and `loadEmptyForm()` functions
-
-3. ✅ Created documentation
-   - TEST_DATA_USAGE.md: Comprehensive usage guide
-   - TEST_DATA_INTEGRATION_COMPLETE.md: Implementation summary
-
-**Benefits:**
-- ⚡ 5-10 minutes saved per testing iteration
-- 🔄 No manual data entry during development
-- ✅ Pre-validated data (all fields correct format)
-- 🧪 Easy to test edge cases
-
-**Next:** End-to-end testing, then Phase 1 (User Profile Migration)
-
-### Phase 1: User Profile System (Week 1) - NOT STARTED
-**Status:** ⏳ NOT STARTED  
-**Estimated Time:** 14 hours (1.75 days)
-
-**Tasks:**
-- [ ] Task 1.1: Create User Profile Schema (4 hours)
-- [ ] Task 1.2: Cosmos DB Migration Script (4 hours)
-- [ ] Task 1.3: Update Backend Services (6 hours)
-
-**Priority Tasks:**
-1. Define UserProfile interface
-2. Create user-profiles container in Cosmos DB
-3. Migrate Tiferet's hardcoded data → database
-4. Update buildSystemPrompt() to use dynamic profiles
-
-### Phase 2: Dashboard Enhancements (Week 2) - NOT STARTED
-**Status:** ⏳ NOT STARTED  
-**Estimated Time:** 30 hours (3.75 days)
-
-**Tasks:**
-- [ ] Task 2.1: Photo Upload Component (8 hours)
-- [ ] Task 2.2: Music Preferences Form (4 hours)
-- [ ] Task 2.3: Expand to 12-step onboarding (8 hours)
-- [ ] Task 2.4: Enhanced crisis trigger UI (4 hours)
-- [ ] Task 2.5: Medication scheduling improvements (6 hours)
-
-### Phase 3: Backend Integration (Week 3) - NOT STARTED
-**Status:** ⏳ NOT STARTED  
-**Estimated Time:** 22 hours (2.75 days)
-
-**Tasks:**
-- [ ] Task 3.1: Dynamic system prompt generation (6 hours)
-- [ ] Task 3.2: Photo storage & retrieval (6 hours)
-- [ ] Task 3.3: Music integration (6 hours)
-- [ ] Task 3.4: Automated reminder scheduling (4 hours)
-
-### Phase 4: Multi-Family Support (Week 4) - NOT STARTED
-**Status:** ⏳ NOT STARTED  
-**Estimated Time:** 24 hours (3 days)
-
-**Tasks:**
-- [ ] Task 4.1: NextAuth.js integration (8 hours)
-- [ ] Task 4.2: Family account management (8 hours)
-- [ ] Task 4.3: Permissions & role-based access (8 hours)
-
-**Success Metrics:**
-- 10-15 minute onboarding completion time
-- 10+ photos uploadable per family
-- Dynamic system prompts per patient
-- 2nd family successfully onboarded (validation)
 
 ---
 
@@ -400,48 +298,26 @@ npx ts-node scripts/test-reminder-system.ts
 
 ---
 
-## 🧪 Week 7-8: Testing + Polish - IN PROGRESS (20%)
-
-### Task 7.1: Manual Testing Scenarios 🚧
-- Status: **IN PROGRESS** (40%)
-- Started: November 11, 2025
-- Evidence: 
-  - ✅ Test Scenario 1 (Memory Continuity): COMPLETE
-  - ✅ Test Scenario 2 (Medication Reminders): BACKEND VERIFIED (WebSocket pending)
-  - 🚧 Test Scenario 3 (Crisis Detection): STARTING NOW
-  - ⏳ Test Scenario 4 (Photo Triggering): NOT STARTED
-  - ⏳ Test Scenario 5 (50-Turn Window): NOT STARTED
-- Files:
-  - `TEST_SCENARIO_1_CHECKLIST.md` ✅
-  - `TEST_SCENARIO_1_SUMMARY.md` ✅
-  - `TEST_SCENARIO_2_CHECKLIST.md` ✅
-  - `TEST_SCENARIO_2_SUMMARY.md` ✅
-  - `BUG_FIXES_TEST_SCENARIO_2.md` ✅
-  - `BUG_3_REMINDERS_NOT_FIRING.md` ✅
-  - `docs/TASK_7.1_TESTING_PLAN.md`
-
-**Test Scenario 2 Progress:**
-- ✅ Bug #1 Fixed: AI now uses correct name "תפארת" 
-- ✅ Bug #2 Fixed: AI knows medications from safety-config
-- ✅ Bug #3 Identified: Reminders not created in database
-  - Root cause: Script only updates safety-config, doesn't create reminder documents
-  - Fix: Call `/reminder/daily/medications` API endpoint
-  - Test results (20:49): Cron job works! Backend triggers reminder correctly
-  - Status: Backend verified, WebSocket to Flutter pending (separate task)
-- 🚧 Next: Test confirmation/snooze/decline flows
-- See: `BUG_FIXES_TEST_SCENARIO_2.md`, `BUG_3_REMINDERS_NOT_FIRING.md`
-
----
-
 ## 🎯 Recommended Next Steps
 
-### Immediate: Complete Test Scenario 2
-1. ✅ Wait for 20:21 medication reminder
-2. Test successful confirmation
-3. Add another medication and test snooze
-4. Test 3x decline escalation
-5. Document results in checklist
-6. Move to Test Scenario 3 (Crisis Detection)
+### Option 1: Continue Backend (Recommended)
+**Task 4.2: Safety Config Loading**
+- Create `SafetyConfigService`
+- Load safety rules from Cosmos DB
+- Inject into Realtime API sessions
+- Implement crisis detection
+
+### Option 2: Start Flutter Frontend
+**Task 5.1: Flutter Mac Desktop Setup**
+- Initialize Flutter project
+- Set up macOS entitlements
+- Create basic UI layout
+- WebSocket client skeleton
+
+### Option 3: Polish Dashboard
+- Implement localStorage auto-save
+- Add edit configuration feature
+- Test end-to-end onboarding flow
 
 ---
 

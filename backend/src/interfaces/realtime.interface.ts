@@ -35,6 +35,7 @@ export interface SystemPromptContext {
   cognitiveMode: string;
   familyMembers: Array<{ name: string; relationship: string }>;
   safetyRules: any;
+  medications: Array<{ name: string; dosage: string; times: string[] }>;
   memories: {
     shortTerm: any[];
     working: any;

@@ -34,8 +34,21 @@ export interface CrisisTrigger {
   action: string;
 }
 
+export interface PatientBackground {
+  fullName: string;
+  age: number;
+  medicalCondition: string;
+  personality: string;
+  hobbies: string;
+  familyContext?: string;
+  importantMemories?: string;
+}
+
 export interface OnboardingFormData {
   userId: string;
+  
+  // Step 0: Patient Background
+  patientBackground: PatientBackground;
   
   // Step 1: Emergency Contacts
   emergencyContacts: EmergencyContact[];
@@ -65,6 +78,7 @@ export interface OnboardingFormData {
 export interface SafetyConfig {
   id: string;
   userId: string;
+  patientBackground: PatientBackground;
   emergencyContacts: EmergencyContact[];
   medications: Medication[];
   routines: DailyRoutine;

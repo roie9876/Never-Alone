@@ -57,14 +57,25 @@ export class RealtimeService {
     const userProfile = await this.loadUserProfile(config.userId);
     const safetyConfig = await this.loadSafetyConfig(config.userId);
 
-    // 3. Build system prompt with context
+    // 3. Extract user name from profile (handle both old and new schema)
+    const userName = userProfile?.name ||
+                     userProfile?.personalInfo?.fullName ||
+                     userProfile?.personalInfo?.firstName ||
+                     'User';
+
+    const userAge = userProfile?.age ||
+                    userProfile?.personalInfo?.age ||
+                    70;
+
+    // 4. Build system prompt with context
     const systemPrompt = this.buildSystemPrompt({
-      userName: userProfile?.name || 'User',
-      userAge: userProfile?.age || 70,
-      language: config.language || 'he',
+      userName,
+      userAge,
+      language: config.language || userProfile?.personalInfo?.language || 'he',
       cognitiveMode: userProfile?.cognitiveMode || 'standard',
       familyMembers: userProfile?.familyMembers || [],
       safetyRules: safetyConfig,
+      medications: safetyConfig?.medications || [],
       memories,
     });
 
@@ -285,9 +296,32 @@ export class RealtimeService {
         const memory = await this.memoryService.saveLongTermMemory(session.userId, args);
         result = { success: true, memoryId: memory.id };
       } else if (functionName === 'trigger_family_alert') {
-        // TODO: Implement family alert (Week 4)
-        result = { success: true, message: 'Alert sent to family' };
-        this.logger.warn(`Safety alert triggered: ${args.safety_rule_violated}`);
+        // Save safety incident to database
+        const incident = {
+          id: `incident_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          userId: session.userId,
+          type: 'safety_incident',
+          timestamp: new Date().toISOString(),
+          conversationId: session.conversationId,
+          sessionId: session.id,
+          severity: args.severity || 'medium',
+          userRequest: args.user_request || '',
+          safetyRuleViolated: args.safety_rule_violated || '',
+          context: args.context || '',
+          resolved: false,
+        };
+
+        try {
+          // Save to Cosmos DB safety-incidents container
+          await this.azureConfig.safetyIncidentsContainer.items.create(incident);
+          this.logger.warn(`⚠️ Safety incident saved: ${args.severity} - ${args.user_request}`);
+
+          // TODO: Send actual SMS/email to family (Week 4)
+          result = { success: true, message: 'Alert sent to family', incidentId: incident.id };
+        } catch (error) {
+          this.logger.error(`Failed to save safety incident: ${error.message}`);
+          result = { success: false, error: 'Failed to save incident' };
+        }
       } else if (functionName === 'show_photos') {
         // Trigger photo display based on conversation context
         const photoEvent = await this.photoService.triggerPhotoDisplay(
@@ -411,7 +445,7 @@ export class RealtimeService {
    * Build system prompt with user context and memories
    */
   private buildSystemPrompt(context: SystemPromptContext): string {
-    const { userName, userAge, language, cognitiveMode, familyMembers, memories } = context;
+    const { userName, userAge, language, cognitiveMode, familyMembers, medications, memories } = context;
 
     // Format memories for prompt
     const shortTermFormatted = memories.shortTerm
@@ -421,6 +455,11 @@ export class RealtimeService {
     const longTermFormatted = memories.longTerm
       .map((mem) => `- ${mem.value}`)
       .join('\n');
+
+    // Format medications for prompt
+    const medicationsFormatted = medications && medications.length > 0
+      ? medications.map((med) => `- ${med.name} (${med.dosage}) - taken at: ${med.times.join(', ')}`).join('\n')
+      : 'No medications configured';
 
     // CRITICAL: Force Hebrew language for Israeli users
     const isHebrew = language === 'he' || language === 'he-IL';
@@ -440,6 +479,10 @@ Current time: ${new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' 
 
 # FAMILY MEMBERS
 ${familyMembers.map((fm) => `- ${fm.name} (${fm.relationship})`).join('\n')}
+
+# MEDICATIONS
+${medicationsFormatted}
+When user asks about medications, refer to the list above. Help them remember when to take medications.
 
 # RECENT CONVERSATION (Last 10 turns)
 ${shortTermFormatted || 'No recent conversation'}
@@ -497,13 +540,31 @@ Always be warm, patient, and emotionally present.`;
       safetyConfig.neverAllow.forEach((rule: any) => {
         rules.push(`- ${rule.rule}: ${rule.reason}`);
       });
+      rules.push('\nWhen user requests something unsafe:');
+      rules.push('1. Respond gently: "זה רעיון טוב, אבל בוא נבדוק עם [family member] קודם"');
+      rules.push('2. IMMEDIATELY call trigger_family_alert() with severity="medium" or "high"');
+      rules.push('3. Offer safe alternative activity');
     }
 
     if (safetyConfig.crisisTriggers?.length > 0) {
-      rules.push('\nALERT IMMEDIATELY if user mentions:');
+      rules.push('\n⚠️ CRITICAL: CRISIS TRIGGERS - Call trigger_family_alert() IMMEDIATELY if user says:');
       safetyConfig.crisisTriggers.forEach((trigger: string) => {
         rules.push(`- "${trigger}"`);
       });
+      rules.push('\nWhen crisis trigger detected:');
+      rules.push('1. Show empathy first: "זה נשמע ממש קשה. אתה לא לבד."');
+      rules.push('2. IMMEDIATELY call trigger_family_alert() with severity="critical"');
+      rules.push('3. Offer to contact family: "בוא נדבר עם [family member] עכשיו"');
+      rules.push('4. Do NOT try to solve the crisis yourself - escalate to family');
+    }
+
+    if (safetyConfig.forbiddenTopics?.length > 0) {
+      rules.push('\nForbidden topics (redirect politely, do NOT alert):');
+      safetyConfig.forbiddenTopics.forEach((topic: string) => {
+        rules.push(`- "${topic}"`);
+      });
+      rules.push('If user mentions forbidden topic: "אני לא כל כך מבין ב[topic]. בוא נדבר על משהו אחר."');
+      rules.push('Do NOT call trigger_family_alert() for forbidden topics!');
     }
 
     return rules.join('\n');

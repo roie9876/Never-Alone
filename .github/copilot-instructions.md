@@ -1,5 +1,7 @@
 # GitHub Copilot Instructions for Never Alone
 
+talk in english not in hebrew even if im write in hebrew you need to answer in english
+
 **Project:** Never Alone - AI Companion for Elderly & Dementia Patients  
 **Purpose:** Help GitHub Copilot understand project structure, tech stack, and coding patterns
 
@@ -231,23 +233,60 @@ async monitorTranscript(transcript: string, userId: string) {
 
 ## 🔐 Environment Variables
 
+**CRITICAL: Use Azure AD authentication for Cosmos DB and Blob Storage (NO connection strings!)**
+
 ```bash
 # Azure OpenAI
 AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com
 AZURE_OPENAI_KEY=<key>
 AZURE_OPENAI_DEPLOYMENT=gpt-4o-realtime-preview
 
-# Cosmos DB
-COSMOS_CONNECTION_STRING=<connection-string>
+# Cosmos DB (Azure AD - NO connection strings!)
+COSMOS_ENDPOINT=https://neveralone.documents.azure.com:443/
 COSMOS_DATABASE=never-alone
+# Authentication: Uses DefaultAzureCredential (no COSMOS_KEY or COSMOS_CONNECTION_STRING)
 
-# Redis
+# Redis (Password-based - Azure AD not yet supported)
 REDIS_URL=redis://<host>:6380?password=<key>
 
-# Blob Storage
-BLOB_STORAGE_CONNECTION_STRING=<connection-string>
-BLOB_CONTAINER=audio-files
+# Blob Storage (Azure AD - NO connection strings!)
+BLOB_STORAGE_ACCOUNT_NAME=neveralone
+# Authentication: Uses DefaultAzureCredential (no BLOB_STORAGE_CONNECTION_STRING)
 ```
+
+### Azure AD Authentication Pattern (MANDATORY)
+
+**All Cosmos DB and Blob Storage code MUST use this pattern:**
+
+```typescript
+// ✅ CORRECT: Azure AD with DefaultAzureCredential
+import { CosmosClient } from '@azure/cosmos';
+import { BlobServiceClient } from '@azure/storage-blob';
+import { DefaultAzureCredential } from '@azure/identity';
+
+const credential = new DefaultAzureCredential();
+
+// Cosmos DB
+const cosmosClient = new CosmosClient({
+  endpoint: process.env.COSMOS_ENDPOINT,
+  aadCredentials: credential
+});
+
+// Blob Storage
+const blobServiceClient = new BlobServiceClient(
+  `https://${process.env.BLOB_STORAGE_ACCOUNT_NAME}.blob.core.windows.net`,
+  credential
+);
+```
+
+**❌ NEVER use connection strings or keys in code:**
+```typescript
+// ❌ WRONG: Connection strings (security risk!)
+const cosmosClient = new CosmosClient(process.env.COSMOS_CONNECTION_STRING);
+const blobServiceClient = new BlobServiceClient(process.env.BLOB_STORAGE_CONNECTION_STRING);
+```
+
+**See:** `backend/AZURE_AD_AUTHENTICATION_GUIDE.md` for complete setup and troubleshooting
 
 ---
 

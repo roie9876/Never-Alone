@@ -23,6 +23,7 @@ export class AzureConfigService implements OnModuleInit {
   public remindersContainer: Container;
   public photosContainer: Container;
   public safetyConfigContainer: Container;
+  public safetyIncidentsContainer: Container;
   public musicPreferencesContainer: Container;
   public musicPlaybackHistoryContainer: Container;
 
@@ -69,6 +70,7 @@ export class AzureConfigService implements OnModuleInit {
     this.remindersContainer = this.database.container('reminders');
     this.photosContainer = this.database.container('photos');
     this.safetyConfigContainer = this.database.container('safety-config');
+    this.safetyIncidentsContainer = this.database.container('safety-incidents');
     this.musicPreferencesContainer = this.database.container('user-music-preferences');
     this.musicPlaybackHistoryContainer = this.database.container('music-playback-history');
 

@@ -15,6 +15,15 @@ const TEST_USER_ID = 'test-user-safety-config';
 const TEST_SAFETY_CONFIG: SafetyConfig = {
   id: `config_${Date.now()}`,
   userId: TEST_USER_ID,
+  patientBackground: {
+    fullName: 'Test Patient',
+    age: 75,
+    medicalCondition: 'Early dementia, diabetes',
+    personality: 'Kind and thoughtful',
+    hobbies: 'Walking, listening to music',
+    familyContext: 'Has 2 children and 4 grandchildren',
+    importantMemories: 'Former accountant, loves classical music',
+  },
   emergencyContacts: [
     {
       name: 'Sarah Cohen',
