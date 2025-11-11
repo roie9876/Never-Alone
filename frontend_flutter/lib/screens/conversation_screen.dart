@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import '../models/app_state.dart';
 import '../widgets/transcript_view.dart';
 import '../widgets/audio_waveform.dart';
+import '../widgets/photo_overlay.dart';
 import '../services/realtime_conversation_manager.dart';
+import 'dart:async';
 
 class ConversationScreen extends StatefulWidget {
   const ConversationScreen({super.key});
@@ -15,28 +17,116 @@ class ConversationScreen extends StatefulWidget {
 class _ConversationScreenState extends State<ConversationScreen> {
   static const String testUserId = 'test-user-123'; // TODO: Get from auth
   
+  // Photo display state
+  List<Map<String, dynamic>> _photoQueue = [];
+  bool _isShowingPhoto = false;
+  Timer? _photoTimer;
+  
+  @override
+  void initState() {
+    super.initState();
+    
+    // Set up photo trigger callback
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final conversationManager = Provider.of<RealtimeConversationManager>(
+        context,
+        listen: false,
+      );
+      
+      conversationManager.onPhotosTriggered = (photos) {
+        debugPrint('📷 ConversationScreen: Received ${photos.length} photos to display');
+        setState(() {
+          _photoQueue.addAll(photos);
+        });
+        
+        // Start showing photos if not already showing
+        if (!_isShowingPhoto && _photoQueue.isNotEmpty) {
+          _showNextPhoto();
+        }
+      };
+    });
+  }
+  
+  @override
+  void dispose() {
+    _photoTimer?.cancel();
+    super.dispose();
+  }
+  
+  /// Show next photo from queue
+  void _showNextPhoto() {
+    if (_photoQueue.isEmpty) {
+      setState(() {
+        _isShowingPhoto = false;
+      });
+      return;
+    }
+    
+    setState(() {
+      _isShowingPhoto = true;
+    });
+    
+    // Auto-dismiss after 10 seconds
+    _photoTimer?.cancel();
+    _photoTimer = Timer(const Duration(seconds: 10), () {
+      _dismissCurrentPhoto();
+    });
+  }
+  
+  /// Dismiss current photo and show next
+  void _dismissCurrentPhoto() {
+    setState(() {
+      if (_photoQueue.isNotEmpty) {
+        _photoQueue.removeAt(0);
+      }
+    });
+    
+    _photoTimer?.cancel();
+    
+    if (_photoQueue.isNotEmpty) {
+      _showNextPhoto();
+    } else {
+      setState(() {
+        _isShowingPhoto = false;
+      });
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header with title
-            _buildHeader(),
-            
-            // Transcript view (scrollable)
-            const Expanded(
-              child: TranscriptView(),
+      body: Stack(
+        children: [
+          // Main conversation UI
+          SafeArea(
+            child: Column(
+              children: [
+                // Header with title
+                _buildHeader(),
+                
+                // Transcript view (scrollable)
+                const Expanded(
+                  child: TranscriptView(),
+                ),
+                
+                // Audio waveform visualization
+                const AudioWaveform(),
+                
+                // Control buttons
+                _buildControls(),
+              ],
             ),
-            
-            // Audio waveform visualization
-            const AudioWaveform(),
-            
-            // Control buttons
-            _buildControls(),
-          ],
-        ),
+          ),
+          
+          // Photo overlay (shown when photos triggered)
+          if (_isShowingPhoto && _photoQueue.isNotEmpty)
+            PhotoOverlay(
+              photoUrl: _photoQueue.first['url'] ?? '',
+              caption: _photoQueue.first['caption'],
+              onClose: _dismissCurrentPhoto,
+            ),
+        ],
       ),
     );
   }

@@ -27,6 +27,9 @@ class RealtimeConversationManager extends ChangeNotifier {
   // Configuration
   final String backendUrl;
   
+  // Callbacks
+  Function(List<Map<String, dynamic>> photos)? onPhotosTriggered;
+  
   // Getters
   bool get isConversationActive => _isConversationActive;
   bool get isConnected => _websocketService.isConnected;
@@ -90,6 +93,12 @@ class RealtimeConversationManager extends ChangeNotifier {
     _websocketService.onTranscriptReceived = (transcript) {
       debugPrint('RealtimeConversationManager: Transcript: ${transcript.speaker}: ${transcript.transcript}');
       notifyListeners();
+    };
+    
+    // Handle photos triggered by AI
+    _websocketService.onPhotosTriggered = (photos) {
+      debugPrint('📷 RealtimeConversationManager: Photos triggered - ${photos.length} photos');
+      onPhotosTriggered?.call(photos);
     };
     
     // Handle errors

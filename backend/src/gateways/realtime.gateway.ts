@@ -317,4 +317,31 @@ export class RealtimeGateway
       timestamp: new Date().toISOString(),
     });
   }
+
+  /**
+   * Broadcast photos to display to client(s) in session
+   *
+   * Called by RealtimeService when AI triggers photo display
+   */
+  broadcastPhotos(
+    sessionId: string,
+    photos: Array<{
+      url: string;
+      caption: string;
+      taggedPeople: string[];
+      dateTaken?: string;
+      location?: string;
+    }>,
+    triggerReason: string,
+    context: string,
+  ) {
+    this.logger.log(`📷 Broadcasting ${photos.length} photos to session ${sessionId}`);
+    this.server.to(sessionId).emit('display-photos', {
+      sessionId,
+      photos,
+      trigger_reason: triggerReason,
+      context,
+      timestamp: new Date().toISOString(),
+    });
+  }
 }

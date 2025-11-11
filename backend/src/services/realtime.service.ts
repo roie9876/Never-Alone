@@ -299,9 +299,25 @@ export class RealtimeService {
           args.emotional_state,
         );
 
-        if (photoEvent) {
-          // TODO: Send to tablet via WebSocket (Week 5)
-          this.logger.log(`📸 Ready to display ${photoEvent.photos.length} photos`);
+        if (photoEvent && photoEvent.photos.length > 0) {
+          this.logger.log(`📸 Displaying ${photoEvent.photos.length} photos via WebSocket`);
+          
+          // Send photos to tablet via WebSocket gateway
+          if (this.gateway) {
+            this.gateway.broadcastPhotos(
+              session.id,
+              photoEvent.photos.map((p) => ({
+                url: p.url,
+                caption: p.caption || '',
+                taggedPeople: p.taggedPeople || [],
+                dateTaken: p.dateTaken,
+                location: p.location,
+              })),
+              args.trigger_reason,
+              args.context,
+            );
+          }
+          
           result = {
             success: true,
             photos_shown: photoEvent.photos.length,

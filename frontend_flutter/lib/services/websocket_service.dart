@@ -38,6 +38,7 @@ class WebSocketService extends ChangeNotifier {
   Function(String base64Audio)? onAIAudioReceived;
   Function(ConversationTurn transcript)? onTranscriptReceived;
   Function(Map<String, dynamic> status)? onSessionStatusUpdated;
+  Function(List<Map<String, dynamic>> photos)? onPhotosTriggered;
   Function(String error)? onError;
   
   // Getters
@@ -156,6 +157,24 @@ class WebSocketService extends ChangeNotifier {
     _socket!.on('session-status', (data) {
       debugPrint('WebSocketService: Session status: $data');
       onSessionStatusUpdated?.call(data);
+      notifyListeners();
+    });
+    
+    // Photos triggered by AI during conversation
+    _socket!.on('display-photos', (data) {
+      debugPrint('📷 WebSocketService: Photos triggered: ${data['photos']?.length ?? 0} photos');
+      
+      if (data['photos'] != null && data['photos'] is List) {
+        final photos = (data['photos'] as List)
+            .map((p) => p as Map<String, dynamic>)
+            .toList();
+        
+        debugPrint('📷 WebSocketService: Parsed ${photos.length} photos');
+        onPhotosTriggered?.call(photos);
+      } else {
+        debugPrint('📷 WebSocketService: Invalid photos data format');
+      }
+      
       notifyListeners();
     });
     
