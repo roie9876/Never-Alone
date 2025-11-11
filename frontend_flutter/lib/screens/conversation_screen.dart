@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/app_state.dart';
 import '../widgets/transcript_view.dart';
 import '../widgets/audio_waveform.dart';
+import '../services/realtime_conversation_manager.dart';
 
 class ConversationScreen extends StatefulWidget {
   const ConversationScreen({super.key});
@@ -12,6 +13,8 @@ class ConversationScreen extends StatefulWidget {
 }
 
 class _ConversationScreenState extends State<ConversationScreen> {
+  static const String testUserId = 'test-user-123'; // TODO: Get from auth
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -54,9 +57,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            'Never Alone', // Hebrew: לעולם לא לבד
-            style: Theme.of(context).textTheme.headlineMedium,
+          const Text(
+            'לא לבד',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.settings, size: 32),
@@ -70,8 +76,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
   
   Widget _buildControls() {
-    return Consumer<AppState>(
-      builder: (context, appState, child) {
+    return Consumer2<AppState, RealtimeConversationManager>(
+      builder: (context, appState, conversationManager, child) {
+        final isConversationActive = conversationManager.isConversationActive;
+        final isConnected = conversationManager.isConnected;
+        final hasError = conversationManager.lastError != null;
+        
         return Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
@@ -84,32 +94,129 @@ class _ConversationScreenState extends State<ConversationScreen> {
               ),
             ],
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Start/Stop conversation button
-              ElevatedButton.icon(
-                onPressed: () {
-                  // TODO: Implement in Task 5.2
-                  if (appState.isListening) {
-                    appState.stopListening();
-                  } else {
-                    appState.startListening();
-                  }
-                },
-                icon: Icon(
-                  appState.isListening ? Icons.stop : Icons.mic,
-                  size: 32,
+              // Connection status - only show when there's an actual error
+              if (hasError)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error,
+                        color: Colors.red,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        conversationManager.lastError!,
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                label: Text(
-                  appState.isListening ? 'עצור' : 'התחל שיחה',
-                  style: const TextStyle(fontSize: 24),
+              
+              // Recording indicator
+              if (isConversationActive && conversationManager.isRecording)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Recording...',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(300, 100),
-                  backgroundColor: appState.isListening ? Colors.red : Colors.blue,
-                  foregroundColor: Colors.white,
+              
+              // AI speaking indicator
+              if (conversationManager.isPlayingAudio)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.volume_up,
+                        color: Colors.blue[700],
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'AI speaking...',
+                        style: TextStyle(
+                          color: Colors.blue[700],
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+              
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Start/Stop conversation button
+                  ElevatedButton.icon(
+                    onPressed: isConnected || isConversationActive
+                        ? () async {
+                            if (isConversationActive) {
+                              await conversationManager.stopConversation();
+                              appState.stopListening();
+                            } else {
+                              try {
+                                await conversationManager.startConversation(testUserId);
+                                appState.startListening();
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Failed to start conversation: $e'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              }
+                            }
+                          }
+                        : null,
+                    icon: Icon(
+                      isConversationActive ? Icons.stop : Icons.mic,
+                      size: 32,
+                    ),
+                    label: Text(
+                      isConversationActive ? 'עצור' : 'התחל שיחה',
+                      style: const TextStyle(fontSize: 24),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(300, 100),
+                      backgroundColor: isConversationActive ? Colors.red : Colors.blue,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.grey,
+                      disabledForegroundColor: Colors.white70,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

@@ -18,7 +18,8 @@ dependencies:
   web_socket_channel: ^2.4.0
   
   # Audio recording & playback
-  # record: ^5.0.4  # Disabled due to Linux plugin compatibility issue
+  record: ^6.0.0  # Audio recording with native echo cancellation (latest version)
+  flutter_webrtc: ^0.9.48  # WebRTC for Acoustic Echo Cancellation (kept for future use)
   audioplayers: ^5.2.1
   file_picker: ^8.0.0+1  # For selecting audio files (temporary workaround)
   
@@ -26,11 +27,12 @@ dependencies:
   provider: ^6.1.1
   
   # HTTP requests
-  http: ^1.1.2
+  http: ^1.6.0
   
   # Utilities
   path_provider: ^2.1.1
   intl: ^0.18.1
+  socket_io_client: ^3.0.2
 
 dev_dependencies:
   flutter_test:

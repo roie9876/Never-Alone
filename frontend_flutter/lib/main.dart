@@ -3,11 +3,38 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'screens/conversation_screen.dart';
 import 'models/app_state.dart';
+import 'services/websocket_service.dart';
+import 'services/audio_service.dart';
+import 'services/audio_playback_service.dart';
+import 'services/realtime_conversation_manager.dart';
 
 void main() {
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => AppState(),
+    MultiProvider(
+      providers: [
+        // Core services
+        ChangeNotifierProvider(create: (_) => WebSocketService()),
+        ChangeNotifierProvider(create: (_) => AudioService()),
+        ChangeNotifierProvider(create: (_) => AudioPlaybackService()),
+        
+        // Conversation manager (depends on other services)
+        ChangeNotifierProxyProvider3<WebSocketService, AudioService, AudioPlaybackService, RealtimeConversationManager>(
+          create: (context) => RealtimeConversationManager(
+            websocketService: context.read<WebSocketService>(),
+            audioService: context.read<AudioService>(),
+            playbackService: context.read<AudioPlaybackService>(),
+          ),
+          update: (context, ws, audio, playback, previous) =>
+              previous ?? RealtimeConversationManager(
+                websocketService: ws,
+                audioService: audio,
+                playbackService: playback,
+              ),
+        ),
+        
+        // App state (legacy, can be removed later)
+        ChangeNotifierProvider(create: (_) => AppState()),
+      ],
       child: const NeverAloneApp(),
     ),
   );
@@ -19,7 +46,7 @@ class NeverAloneApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Never Alone',
+      title: 'לא לבד',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         // High contrast theme for elderly users

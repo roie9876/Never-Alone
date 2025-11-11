@@ -28,6 +28,7 @@ export class RealtimeService {
   private readonly logger = new Logger(RealtimeService.name);
   private activeSessions: Map<string, RealtimeSession> = new Map();
   private sessionWebSockets: Map<string, WebSocket> = new Map();
+  private gateway: any; // Reference to RealtimeGateway (set via setGateway method)
 
   constructor(
     private configService: ConfigService,
@@ -35,6 +36,13 @@ export class RealtimeService {
     private memoryService: MemoryService,
     private photoService: PhotoService,
   ) {}
+
+  /**
+   * Set gateway reference (called by gateway during initialization)
+   */
+  setGateway(gateway: any): void {
+    this.gateway = gateway;
+  }
 
   /**
    * Create a new Realtime API session with memory injection
@@ -176,11 +184,24 @@ export class RealtimeService {
 
       case 'conversation.item.input_audio_transcription.completed':
         // User spoke - transcript ready
+        this.logger.debug(`📝 Input transcription event: item_id=${event.item_id}, transcript="${event.transcript?.substring(0, 30)}..."`);
         await this.handleUserTranscript(session, event);
+        break;
+
+      case 'response.audio.delta':
+        // AI audio chunk received - forward to client
+        if (this.gateway && event.delta) {
+          this.gateway.broadcastAIAudio(session.id, {
+            delta: event.delta,
+            timestamp: new Date().toISOString(),
+          });
+          this.logger.debug(`Forwarded ${event.delta.length} chars of audio for session ${session.id}`);
+        }
         break;
 
       case 'response.audio_transcript.done':
         // AI response complete - transcript ready
+        this.logger.debug(`🤖 AI transcript event: response_id=${event.response_id}, transcript="${event.transcript?.substring(0, 30)}..."`);
         await this.handleAITranscript(session, event);
         break;
 
@@ -198,6 +219,10 @@ export class RealtimeService {
         break;
 
       default:
+        // Log unknown transcript events to catch duplicates
+        if (event.type?.includes('transcript') || event.type?.includes('transcription')) {
+          this.logger.warn(`⚠️ Unhandled transcript event: ${event.type}, data: ${JSON.stringify(event).substring(0, 200)}`);
+        }
         // Ignore other events for MVP
         break;
     }
@@ -381,12 +406,19 @@ export class RealtimeService {
       .map((mem) => `- ${mem.value}`)
       .join('\n');
 
+    // CRITICAL: Force Hebrew language for Israeli users
+    const isHebrew = language === 'he' || language === 'he-IL';
+
     return `You are a warm, empathetic AI companion for elderly users.
+
+# CRITICAL LANGUAGE INSTRUCTION
+${isHebrew ? 'אתה חייב לדבר בעברית בלבד! תמיד תענה בעברית, גם אם המשתמש מדבר באנגלית.' : 'Always speak in English.'}
+${isHebrew ? 'YOU MUST SPEAK HEBREW ONLY! Always respond in Hebrew, even if the user speaks English.' : ''}
 
 # USER CONTEXT
 Name: ${userName}
 Age: ${userAge}
-Language: ${language === 'he' ? 'Hebrew' : 'English'} (respond in this language)
+Language: ${isHebrew ? 'עברית (Hebrew)' : 'English'}
 Mode: ${cognitiveMode}
 Current time: ${new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })}
 
@@ -402,7 +434,7 @@ ${longTermFormatted || 'No memories yet'}
 # YOUR ROLE
 - Provide companionship and conversation
 - Be patient with repetition - memory issues are expected
-- Speak in ${language === 'he' ? 'Hebrew' : 'English'}
+- ${isHebrew ? 'דבר בעברית בלבד! (Speak ONLY in Hebrew!)' : 'Speak in English'}
 - Keep responses SHORT (2-3 sentences maximum)
 - When user mentions NEW important information (family, preferences, health), call extract_important_memory()
 
@@ -611,8 +643,13 @@ Always be warm, patient, and emotionally present.`;
   async sendAudioChunk(sessionId: string, audioBase64: string): Promise<void> {
     const ws = this.sessionWebSockets.get(sessionId);
     if (!ws || ws.readyState !== WebSocket.OPEN) {
+      this.logger.warn(`Cannot send audio for session ${sessionId}: WebSocket state = ${ws?.readyState}`);
       throw new Error('WebSocket not connected');
     }
+
+    // Log audio chunk size for debugging
+    const audioBytes = Buffer.from(audioBase64, 'base64').length;
+    this.logger.debug(`Sending ${audioBytes} bytes of audio for session ${sessionId}`);
 
     ws.send(JSON.stringify({
       type: 'input_audio_buffer.append',
@@ -631,6 +668,29 @@ Always be warm, patient, and emotionally present.`;
 
     ws.send(JSON.stringify({
       type: 'input_audio_buffer.commit',
+    }));
+  }
+
+  /**
+   * Cancel AI response (for interruption support)
+   */
+  async cancelResponse(sessionId: string): Promise<void> {
+    const session = this.activeSessions.get(sessionId);
+
+    if (!session) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+
+    const ws = this.sessionWebSockets.get(sessionId);
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      throw new Error(`Session ${sessionId} has no active WebSocket connection`);
+    }
+
+    this.logger.log(`🛑 Canceling AI response for session ${sessionId}`);
+
+    // Send response.cancel to Azure OpenAI Realtime API
+    ws.send(JSON.stringify({
+      type: 'response.cancel',
     }));
   }
 }

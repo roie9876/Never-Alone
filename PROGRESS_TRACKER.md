@@ -12,7 +12,7 @@ Week 1 (Foundation)         █████████████████�
 Week 2 (Realtime API)       ████████████████████ 100% ✅
 Week 3 (Reminders/Photos)   ████████████████████ 100% ✅
 Week 4 (Onboarding)         ████████████████████ 100% ✅
-Week 5-6 (Flutter)          ████████░░░░░░░░░░░░  40% 🚧
+Week 5-6 (Flutter)          ████████████░░░░░░░░  60% 🚧
 Week 7-8 (Testing/Polish)   ░░░░░░░░░░░░░░░░░░░░   0% ⏳
 ```
 
@@ -130,37 +130,15 @@ Week 7-8 (Testing/Polish)   ░░░░░░░░░░░░░░░░░�
 
 ---
 
-## 🚧 Week 5-6: Frontend (Mac Desktop App) - IN PROGRESS
+### Week 5: Frontend Development (Flutter Mac App) - IN PROGRESS
+**Timeline:** November 10-16, 2025  
+**Status:** 🚧 IN PROGRESS - 67% Complete  
+**Owner:** Frontend Engineer
 
-### Task 5.1: Flutter Mac Desktop Setup ✅
-- Status: **CODE COMPLETE** (Runtime testing pending Xcode)
-- Time spent: ~3 hours
-- Evidence: `/TASK_5.1_COMPLETE.md`
-- What's done:
-  1. ✅ Flutter project created with macOS platform support
-  2. ✅ macOS entitlements configured (microphone, camera, network)
-  3. ✅ Dependencies installed (google_fonts, provider, record, audioplayers, etc.)
-  4. ✅ Project structure created (screens/, widgets/, services/, models/, utils/)
-  5. ✅ All 11 source files implemented:
-     - Main app with Provider + Hebrew fonts
-     - ConversationScreen with header, transcript, waveform, controls
-     - TranscriptView with Hebrew RTL support
-     - AudioWaveform with visual feedback
-     - PhotoOverlay for full-screen photos
-     - AudioService with permission handling
-     - AppState with Provider pattern
-     - All models and constants
-  6. ✅ High contrast theme for accessibility (large text, large buttons)
-  7. ✅ Hebrew UI text ("התחל שיחה" / "עצור")
-- **Note:** Runtime testing requires full Xcode installation (can be done in parallel with Task 5.2)
-
-### Task 5.2: Realtime API WebSocket Client
-- Status: **NOT STARTED**
-- Time estimate: 8-10 hours
-
-### Task 5.3: Photo Display Overlay
-- Status: **NOT STARTED**
-- Time estimate: 4-6 hours
+**Progress:**
+- ✅ Task 5.1: Flutter Mac Desktop Setup (100%) - 6 hours - COMPLETE
+- ✅ Task 5.2: Realtime API WebSocket Client (100%) - 6 hours - COMPLETE (Azure integration blocked by Cosmos DB)
+- ⏳ Task 5.3: Photo Display Overlay (0%)
 
 ### Task 5.4: Music Integration - Backend (OPTIONAL)
 - Status: **NOT STARTED**
@@ -225,14 +203,42 @@ Week 7-8 (Testing/Polish)   ░░░░░░░░░░░░░░░░░�
 4. ✅ Cosmos DB network access resolved and tested
 
 ### This Week (Week 5) - 🚧 IN PROGRESS
-1. 🚧 Task 5.1: Flutter Mac Desktop Setup - **IN PROGRESS**
+1. ✅ Task 5.1: Flutter Mac Desktop Setup - **COMPLETE** (6 hours)
    - ✅ Flutter SDK installed (3.35.7)
    - ✅ CocoaPods installed (1.16.2)
    - ✅ macOS desktop enabled
-   - ⏳ Xcode installation pending (App Store download)
-   - 📄 See TASK_5.1_STATUS.md for details
-2. ⏳ Task 5.2: WebSocket client implementation
-3. ⏳ Task 5.3: Photo overlay widget
+   - ✅ Xcode configuration complete
+   - ✅ App builds and runs successfully
+   - 📄 See TASK_5.1_COMPLETE.md for details
+2. ✅ Task 5.2: WebSocket client implementation - **COMPLETE** (6 hours)
+   - ✅ WebSocket bidirectional communication working
+   - ✅ Audio recording (PCM16, 16kHz) operational
+   - ✅ Session management via REST + WebSocket
+   - ✅ Hebrew UI ("לא לבד")
+   - ✅ Cosmos DB firewall issue resolved
+   - 📄 See TASK_5.2_COMPLETE.md for details
+3. ✅ Task 5.2.1: Audio Quality Fixes - **COMPLETE** (4 hours)
+   - ✅ Audio buffering (300ms window)
+   - ✅ Hebrew system prompt (bilingual instructions)
+   - ✅ Performance optimization (1200ms improvement)
+   - ✅ Audio echo fix (microphone pause during AI speech)
+   - ✅ Duplicate transcripts eliminated (user confirmed)
+   - 📄 See TASK_5.2.1_ECHO_FIX_COMPLETE.md for details
+4. ✅ Task 5.2.2: Interruption Support - **COMPLETE** (3 hours)
+   - ✅ Removed microphone pause (allow detection during AI speech)
+   - ✅ Added audio stream listener for interruption detection
+   - ✅ Frontend: `_handleUserInterruption()` method
+   - ✅ Frontend: `sendCancelResponse()` WebSocket method
+   - ✅ Frontend: `stopPlayback()` audio stop method
+   - ✅ Backend: `@SubscribeMessage('cancel-response')` handler
+   - ✅ Backend: `cancelResponse()` method in RealtimeService
+   - ⚠️ User reports: "still very slow response compare to playground" (needs investigation)
+   - 📄 See TASK_5.2.2_INTERRUPTION_COMPLETE.md for details
+5. ⏳ Task 5.2.3: Performance Investigation - **NEXT**
+   - User feedback: Response still slower than Azure Playground
+   - Need to measure each hop: Frontend → Backend → Azure
+   - Target: Identify and optimize bottlenecks
+6. ⏳ Task 5.3: Photo overlay widget
 
 ---
 

@@ -177,4 +177,62 @@ export class RealtimeController {
       message: 'Realtime API controller is running',
     };
   }
+
+  /**
+   * Create a mock/test session (bypasses Cosmos DB for testing)
+   *
+   * POST /realtime/test-session
+   * Body: { userId: string }
+   *
+   * Returns: { session: { id: string, userId: string, status: string } }
+   */
+  @Post('test-session')
+  async createTestSession(
+    @Body() body: { userId: string },
+  ): Promise<{ session: any }> {
+    try {
+      this.logger.log(`Creating TEST session for user: ${body.userId}`);
+
+      if (!body.userId) {
+        throw new HttpException(
+          'userId is required',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Create a mock session object without Cosmos DB
+      const session: RealtimeSession = {
+        id: `test-session-${Date.now()}`,
+        userId: body.userId,
+        conversationId: `test-conv-${Date.now()}`,
+        startedAt: new Date().toISOString(),
+        status: 'active' as const,
+        turnCount: 0,
+        tokenUsage: 0,
+      };
+
+      // Store in memory (RealtimeService's activeSessions map)
+      this.realtimeService['activeSessions'].set(session.id, session);
+
+      this.logger.log(
+        `TEST session created: ${session.id} for user ${body.userId}`,
+      );
+
+      return { session };
+    } catch (error) {
+      this.logger.error(
+        `Failed to create TEST session: ${error.message}`,
+        error.stack,
+      );
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        'Failed to create TEST session',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 }

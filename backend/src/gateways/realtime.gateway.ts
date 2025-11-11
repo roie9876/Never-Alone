@@ -49,7 +49,10 @@ export class RealtimeGateway
   // Map client socket IDs to Realtime session IDs
   private clientSessions = new Map<string, string>();
 
-  constructor(private readonly realtimeService: RealtimeService) {}
+  constructor(private readonly realtimeService: RealtimeService) {
+    // Inject gateway reference into RealtimeService so it can call broadcast methods
+    this.realtimeService.setGateway(this);
+  }
 
   /**
    * Handle new WebSocket connection
@@ -211,6 +214,45 @@ export class RealtimeGateway
       this.logger.error(`Failed to commit audio buffer: ${error.message}`);
       client.emit('error', {
         message: 'Failed to commit audio',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Client cancels AI response (interruption support)
+   *
+   * Event: 'cancel-response'
+   * Payload: { sessionId: string }
+   */
+  @SubscribeMessage('cancel-response')
+  async handleCancelResponse(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { sessionId: string },
+  ) {
+    try {
+      const { sessionId } = data;
+
+      this.logger.log(`🛑 Client ${client.id} canceling AI response for session ${sessionId}`);
+
+      // Verify client is in this session
+      const clientSessionId = this.clientSessions.get(client.id);
+      if (clientSessionId !== sessionId) {
+        client.emit('error', {
+          message: 'Client not in this session',
+          sessionId,
+        });
+        return;
+      }
+
+      // Forward cancel to Azure OpenAI Realtime API
+      await this.realtimeService.cancelResponse(sessionId);
+
+      this.logger.log(`✅ Response canceled successfully for session ${sessionId}`);
+    } catch (error) {
+      this.logger.error(`Failed to cancel response: ${error.message}`);
+      client.emit('error', {
+        message: 'Failed to cancel response',
         error: error.message,
       });
     }
