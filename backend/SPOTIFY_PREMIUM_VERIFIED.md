@@ -31,12 +31,14 @@ Product: PREMIUM
 The following have been added to `/backend/.env`:
 
 ```bash
-SPOTIFY_CLIENT_ID=62cf510d89384d389dfb26a6cb2f1bda
-SPOTIFY_CLIENT_SECRET=288e106571a74b959050389ac5ff4a93
-SPOTIFY_ACCESS_TOKEN=BQDBk6-A_TuUl6KMcaspuV2_tMdBRq8f5penLnKp4GECd2YEgaVn22YLbgdd2tIvzp3YmfeHf3XcJ2V0surW-I7Qb_K1VSvZOvLRKEgmROiOBeWOp6EIs4aUM7l_IFSKEhxzZTDTX1jB23o0KrPFuzgQEpOzrryV_tklzyzwYyfStry1eEbdZ_mdVFr1PCEZD_b-i0c1eMCb7jglgec5vQsRE9hY_WjEpVgglY2-9B56iRx7ivYsJqN79Czoc2y87ON_-Fbghio
-SPOTIFY_REFRESH_TOKEN=AQCTuLHTCvVyqgbbXGOCSul8NiJSGwn4zg20VRfpWNC9CGTtWUJWluSGBIQFHF1L7llUwK8FJs3-uXUerIkORsEh83gFnGHYn64WUwLZhkd8nZ5qz8ih6yHM52F1c-kdDCU
+SPOTIFY_CLIENT_ID=<your_client_id>
+SPOTIFY_CLIENT_SECRET=<your_client_secret>
+SPOTIFY_ACCESS_TOKEN=<generated_access_token>
+SPOTIFY_REFRESH_TOKEN=<generated_refresh_token>
 SPOTIFY_REDIRECT_URI=http://127.0.0.1:8000/callback
 ```
+
+**⚠️ SECURITY NOTE:** Actual credentials are stored in `.env` file (NOT committed to Git). Never commit secrets to version control.
 
 **Note:** Access token expires in 1 hour. Refresh token is permanent and will be used to get new access tokens.
 
