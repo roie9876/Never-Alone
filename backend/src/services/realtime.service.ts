@@ -140,7 +140,7 @@ export class RealtimeService {
         session: {
           modalities: ['text', 'audio'],
           instructions: systemPrompt,
-          voice: config.voice || 'alloy',
+          voice: config.voice || 'shimmer', // Warmer, more energetic voice for Hebrew conversations
           input_audio_format: 'pcm16',
           output_audio_format: 'pcm16',
           input_audio_transcription: {
@@ -157,6 +157,12 @@ export class RealtimeService {
           max_response_output_tokens: 4096,
         },
       }));
+
+      // ✅ Notify Flutter that WebSocket is ready to accept audio
+      if (this.gateway) {
+        this.gateway.notifySessionReady(session.id);
+        this.logger.log(`✅ Session ${session.id} is ready - notified client`);
+      }
     });
 
     ws.on('message', async (data: WebSocket.Data) => {
@@ -324,6 +330,61 @@ export class RealtimeService {
         }
       } else if (functionName === 'show_photos') {
         // Trigger photo display based on conversation context
+        // 🔥 STRATEGY: Await photo query to get descriptions, but broadcast photos async
+        const photoEvent = await this.photoService.triggerPhotoDisplay(
+          session.userId,
+          args.trigger_reason as PhotoTriggerReason,
+          args.mentioned_names,
+          args.keywords,
+          args.context,
+          args.emotional_state,
+        );
+
+        if (photoEvent && photoEvent.photos.length > 0) {
+          this.logger.log(`📸 Broadcasting ${photoEvent.photos.length} photos to session ${session.id}`);
+
+          // 🎯 Broadcast photos IMMEDIATELY (synchronously) so they appear before AI speaks
+          if (this.gateway) {
+            this.gateway.broadcastPhotos(
+              session.id,
+              photoEvent.photos.map((p) => ({
+                url: p.url,
+                caption: p.caption || '',
+                taggedPeople: p.taggedPeople || [],
+                dateTaken: p.dateTaken,
+                location: p.location,
+              })),
+              args.trigger_reason,
+              args.context,
+            );
+            this.logger.log(`✅ Photos broadcast complete - AI can now describe them`);
+          }
+
+          // Return immediately with photo descriptions so AI can talk about them
+          result = {
+            success: true,
+            message: `Found ${photoEvent.photos.length} photo(s)`,
+            photos_shown: photoEvent.photos.length,
+            photo_descriptions: photoEvent.photos.map((p) => {
+              const people = p.taggedPeople && p.taggedPeople.length > 0 ? p.taggedPeople.join(', ') : 'family';
+              const date = p.dateTaken ? new Date(p.dateTaken).toLocaleDateString('he-IL') : 'unknown date';
+              const loc = p.location || 'unknown location';
+              return `Photo of ${people} from ${date} at ${loc}. Caption: ${p.caption || 'No caption'}`;
+            }),
+            mentioned_people: args.mentioned_names || [],
+            photo_context: args.context,
+          };
+        } else {
+          this.logger.warn(`No photos found for user ${session.userId}`);
+          result = {
+            success: false,
+            message: 'No photos found matching your request',
+            photos_shown: 0,
+            photo_descriptions: [],
+          };
+        }
+      } else if (functionName === 'legacy_show_photos') {
+        // Legacy blocking version (kept for reference, not used)
         const photoEvent = await this.photoService.triggerPhotoDisplay(
           session.userId,
           args.trigger_reason as PhotoTriggerReason,
@@ -336,7 +397,6 @@ export class RealtimeService {
         if (photoEvent && photoEvent.photos.length > 0) {
           this.logger.log(`📸 Displaying ${photoEvent.photos.length} photos via WebSocket`);
 
-          // Send photos to tablet via WebSocket gateway
           if (this.gateway) {
             this.gateway.broadcastPhotos(
               session.id,
@@ -373,14 +433,36 @@ export class RealtimeService {
       // Send function result back to Realtime API
       const ws = this.sessionWebSockets.get(session.id);
       if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
+        // Step 1: Send function output
+        const functionOutput = {
           type: 'conversation.item.create',
           item: {
             type: 'function_call_output',
             call_id: event.call_id,
             output: JSON.stringify(result),
           },
-        }));
+        };
+        
+        this.logger.debug(`📤 Sending function result for ${functionName}: ${JSON.stringify(result).substring(0, 200)}...`);
+        ws.send(JSON.stringify(functionOutput));
+        this.logger.debug(`✅ Function result sent to Realtime API`);
+        
+        // Step 2: Tell AI to generate response using the function output
+        // Add instructions to describe photos warmly and enthusiastically
+        const responseCreate = {
+          type: 'response.create',
+          response: {
+            modalities: ['audio', 'text'],
+            instructions: `The photos are now displaying on screen. Describe them warmly and enthusiastically! 
+Start with an excited greeting like "הנה תמונות יפות!" (Here are beautiful photos!), 
+then describe each photo using the descriptions provided. Be warm, joyful, and conversational.`,
+          },
+        };
+        
+        this.logger.debug(`🎤 Requesting AI response after function call`);
+        ws.send(JSON.stringify(responseCreate));
+      } else {
+        this.logger.error(`❌ Cannot send function result - WebSocket not open for session ${session.id}`);
       }
     } catch (error) {
       this.logger.error(`Function call failed: ${error.message}`);
@@ -518,11 +600,21 @@ You can show family photos to ${userName} by calling show_photos() when:
 When calling show_photos(), specify:
 - trigger_reason: Why you're showing photos (user_requested_photos, user_mentioned_family, user_expressed_sadness, long_conversation_engagement)
 - mentioned_names: Any family member names mentioned (e.g., ["Sarah", "מיכל"])
-- keywords: Relevant keywords from conversation (e.g., ["family", "birthday"])
+- keywords: Relevant keywords from conversation (e.g., ["family", "birthday", "נכדים", "grandchildren"])
 - context: Brief explanation of why this is a good moment
 - emotional_state: User's emotional state (happy, sad, neutral, anxious, confused)
 
-IMPORTANT: Always call show_photos() when the user asks to see photos - don't apologize that photos aren't available!
+IMPORTANT BEHAVIOR:
+1. **Always call show_photos()** when user requests photos - don't check if photos exist first!
+2. **If no exact matches found**, the system will return similar family photos instead
+3. **After calling show_photos()**, you will receive photo_descriptions array in the function response
+4. **DESCRIBE EACH PHOTO OUT LOUD** using the descriptions provided:
+   - Say: "הנה תמונה יפה!" (Here's a beautiful photo!)
+   - Then describe it: "זאת תמונה של [names] מ-[date] ב-[location]"
+   - For example: "זאת תמונה של צביה ותפארת מארצות הברית בשנת 2019" (This is a photo of Tzvia and Tiferet from USA in 2019)
+   - **Speak slowly and clearly** - photos display for 10 seconds each, give user time to enjoy
+5. **Be warm and conversational** - help user reminisce: "את זוכר את היום הזה?" (Do you remember that day?)
+6. **Don't rush** - let each photo moment be special
 
 Always be warm, patient, and emotionally present.`;
   }

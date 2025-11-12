@@ -38,6 +38,44 @@ export class PhotoController {
   }
 
   /**
+   * Bulk import photos from dashboard
+   * POST /photo/bulk
+   */
+  @Post('bulk')
+  async bulkUploadPhotos(@Body() body: { userId: string; photos: any[] }) {
+    this.logger.log(`Bulk uploading ${body.photos.length} photos for user ${body.userId}`);
+
+    const results = [];
+    for (const photoData of body.photos) {
+      try {
+        const photo = await this.photoService.uploadPhoto(
+          body.userId,
+          photoData.fileName || 'unknown',
+          photoData.blobUrl,
+          'family-dashboard',
+          photoData.manualTags || [],
+          photoData.caption || '',
+          photoData.location || '',
+          photoData.capturedDate || photoData.uploadedAt,
+        );
+        results.push({ success: true, photoId: photo.id });
+      } catch (error) {
+        this.logger.error(`Failed to upload photo ${photoData.fileName}: ${error.message}`);
+        results.push({ success: false, fileName: photoData.fileName, error: error.message });
+      }
+    }
+
+    const successCount = results.filter((r) => r.success).length;
+    this.logger.log(`Bulk upload complete: ${successCount}/${body.photos.length} photos saved to Cosmos DB`);
+
+    return {
+      success: true,
+      message: `${successCount}/${body.photos.length} photos saved successfully`,
+      results,
+    };
+  }
+
+  /**
    * Query photos by criteria (for testing)
    * GET /photo/:userId?taggedPeople=Sarah&keywords=family,birthday&limit=5
    */

@@ -272,6 +272,21 @@ export class RealtimeGateway
   }
 
   /**
+   * Notify client that session is ready to accept audio
+   *
+   * Called by RealtimeService when WebSocket to Azure OpenAI is connected
+   * Flutter should wait for this event before sending audio
+   */
+  notifySessionReady(sessionId: string) {
+    this.server.to(sessionId).emit('session-ready', {
+      sessionId,
+      ready: true,
+      timestamp: new Date().toISOString(),
+    });
+    this.logger.log(`🎤 Notified session ${sessionId} is ready for audio`);
+  }
+
+  /**
    * Broadcast transcript (user or AI) to client(s) in session
    *
    * Called by RealtimeService when transcripts are received
@@ -336,6 +351,13 @@ export class RealtimeGateway
     context: string,
   ) {
     this.logger.log(`📷 Broadcasting ${photos.length} photos to session ${sessionId}`);
+
+    // Log photo URLs for debugging
+    photos.forEach((photo, index) => {
+      this.logger.debug(`Photo ${index + 1}: ${photo.url.substring(0, 100)}...`);
+      this.logger.debug(`  Caption: ${photo.caption}, Tags: ${photo.taggedPeople.join(', ')}`);
+    });
+
     this.server.to(sessionId).emit('display-photos', {
       sessionId,
       photos,
