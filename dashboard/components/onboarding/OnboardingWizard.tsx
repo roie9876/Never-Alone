@@ -18,6 +18,7 @@ import Step3DailyRoutines from './Step3DailyRoutines';
 import Step4ConversationBoundaries from './Step4ConversationBoundaries';
 import Step5CrisisTriggers from './Step5CrisisTriggers';
 import Step8PhotoUpload from './Step8PhotoUpload';
+import Step9MusicPreferences from './Step9MusicPreferences';
 import Step7Review from './Step7Review';
 
 const steps = [
@@ -28,8 +29,9 @@ const steps = [
   { id: 4, name: 'Conversation Boundaries', component: Step4ConversationBoundaries },
   { id: 5, name: 'Crisis Triggers', component: Step5CrisisTriggers },
   { id: 6, name: 'Voice Calibration', component: null }, // Deferred for MVP
-  { id: 7, name: 'Family Photos', component: Step8PhotoUpload }, // NEW: Photo Upload
-  { id: 8, name: 'Review & Confirm', component: Step7Review },
+  { id: 7, name: 'Family Photos', component: Step8PhotoUpload }, // Photo Upload
+  { id: 8, name: 'Music Preferences', component: Step9MusicPreferences }, // NEW: Music (optional)
+  { id: 9, name: 'Review & Confirm', component: Step7Review },
 ];
 
 export default function OnboardingWizard() {
@@ -76,6 +78,10 @@ export default function OnboardingWizard() {
       case 5:
         fieldsToValidate = ['crisisTriggers'];
         break;
+      case 7:
+        fieldsToValidate = ['photos'];
+        break;
+      // Step 8 (Music Preferences) - optional, no validation required
     }
 
     if (fieldsToValidate.length > 0) {
@@ -86,14 +92,14 @@ export default function OnboardingWizard() {
     if (currentStep === 6) {
       // Skip voice calibration for MVP
       setCurrentStep(7);
-    } else if (currentStep < 8) {
+    } else if (currentStep < 9) {
       setCurrentStep(currentStep + 1);
     }
   };
 
   const prevStep = () => {
-    if (currentStep === 8) {
-      setCurrentStep(7); // From Review back to Photos
+    if (currentStep === 9) {
+      setCurrentStep(8); // From Review back to Music
     } else if (currentStep === 7) {
       setCurrentStep(5); // From Photos skip voice calibration back to Crisis Triggers
     } else if (currentStep > 0) {
@@ -113,6 +119,34 @@ export default function OnboardingWizard() {
       const yamlConfig = generateYAMLConfig(data);
       console.log('✅ YAML config generated');
 
+      // Transform music preferences (comma-separated strings → arrays)
+      const musicPreferencesPayload = data.musicPreferences?.enabled ? {
+        enabled: true,
+        preferredArtists: data.musicPreferences.preferredArtists
+          ?.split(',')
+          .map(a => a.trim())
+          .filter(a => a.length > 0) || [],
+        preferredSongs: data.musicPreferences.preferredSongs
+          ?.split(',')
+          .map(s => s.trim())
+          .filter(s => s.length > 0) || [],
+        preferredGenres: data.musicPreferences.preferredGenres
+          ?.split(',')
+          .map(g => g.trim())
+          .filter(g => g.length > 0) || [],
+        allowAutoPlay: data.musicPreferences.allowAutoPlay,
+        playOnSadness: data.musicPreferences.playOnSadness,
+        maxSongsPerSession: data.musicPreferences.maxSongsPerSession,
+      } : {
+        enabled: false,
+        preferredArtists: [],
+        preferredSongs: [],
+        preferredGenres: [],
+        allowAutoPlay: false,
+        playOnSadness: false,
+        maxSongsPerSession: 3,
+      };
+
       // Prepare payload for API
       const payload = {
         id: uuidv4(),
@@ -124,6 +158,7 @@ export default function OnboardingWizard() {
         boundaries: data.boundaries,
         crisisTriggers: data.crisisTriggers,
         photos: data.photos || [], // Include photos (optional)
+        musicPreferences: musicPreferencesPayload, // Include music preferences
         yamlConfig,
         createdAt: data.createdAt,
         updatedAt: new Date().toISOString(),

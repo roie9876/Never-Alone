@@ -29,6 +29,8 @@ class RealtimeConversationManager extends ChangeNotifier {
   
   // Callbacks
   Function(List<Map<String, dynamic>> photos)? onPhotosTriggered;
+  Function(Map<String, dynamic> musicData)? onMusicPlayback;
+  Function(String reason)? onStopMusic;
   
   // Getters
   bool get isConversationActive => _isConversationActive;
@@ -99,6 +101,19 @@ class RealtimeConversationManager extends ChangeNotifier {
     _websocketService.onPhotosTriggered = (photos) {
       debugPrint('📷 RealtimeConversationManager: Photos triggered - ${photos.length} photos');
       onPhotosTriggered?.call(photos);
+    };
+    
+    // Handle music playback triggered by AI
+    _websocketService.onMusicPlayback = (musicData) {
+      debugPrint('🎵 RealtimeConversationManager: Music playback triggered');
+      debugPrint('🎵 RealtimeConversationManager: Video: ${musicData['videoId']}, Title: ${musicData['title']}');
+      onMusicPlayback?.call(musicData);
+    };
+    
+    // Handle stop music request from AI
+    _websocketService.onStopMusic = (reason) {
+      debugPrint('🎵 RealtimeConversationManager: Stop music requested - reason: $reason');
+      onStopMusic?.call(reason);
     };
     
     // Handle errors

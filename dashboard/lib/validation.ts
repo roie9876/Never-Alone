@@ -63,6 +63,33 @@ export const photoSchema = z.object({
   size: z.number().positive('File size must be positive'),
 });
 
+// Music Preferences Schema (Optional - therapeutic music playback)
+export const musicPreferencesSchema = z.object({
+  enabled: z.boolean().default(false),
+  preferredArtists: z.string().optional(),
+  preferredSongs: z.string().optional(),
+  preferredGenres: z.string().optional(),
+  allowAutoPlay: z.boolean().default(false),
+  playOnSadness: z.boolean().default(false),
+  maxSongsPerSession: z.number().min(1).max(5).default(3),
+}).refine(
+  (data) => {
+    // If music is enabled, require at least one of: artists, songs, or genres
+    if (data.enabled) {
+      return (
+        (data.preferredArtists && data.preferredArtists.trim().length > 0) ||
+        (data.preferredSongs && data.preferredSongs.trim().length > 0) ||
+        (data.preferredGenres && data.preferredGenres.trim().length > 0)
+      );
+    }
+    return true;
+  },
+  {
+    message: 'When music is enabled, please provide at least one of: preferred artists, songs, or genres',
+    path: ['preferredArtists'], // Show error on first field
+  }
+);
+
 // Complete Onboarding Form Schema
 export const onboardingFormSchema = z.object({
   userId: z.string().min(3, 'User ID must be at least 3 characters'),
@@ -78,6 +105,7 @@ export const onboardingFormSchema = z.object({
     enabled: z.boolean(),
   }).optional(),
   photos: z.array(photoSchema).max(20, 'Maximum 20 photos allowed').optional().default([]), // NEW: Family photos (optional)
+  musicPreferences: musicPreferencesSchema.optional(), // NEW: Music preferences (optional)
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

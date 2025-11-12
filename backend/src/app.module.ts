@@ -11,10 +11,12 @@ import { RealtimeService } from './services/realtime.service';
 import { ReminderService } from './services/reminder.service';
 import { PhotoService } from './services/photo.service';
 import { SafetyConfigService } from './services/safety-config.service';
+import { MusicService } from './services/music.service';
 import { MemoryController } from './controllers/memory.controller';
 import { RealtimeController } from './controllers/realtime.controller';
 import { ReminderController } from './controllers/reminder.controller';
 import { PhotoController } from './controllers/photo.controller';
+import { MusicController } from './controllers/music.controller';
 import { HealthController } from './controllers/health.controller';
 import { RealtimeGateway } from './gateways/realtime.gateway';
 
@@ -32,6 +34,7 @@ import { RealtimeGateway } from './gateways/realtime.gateway';
     RealtimeController,
     ReminderController,
     PhotoController,
+    MusicController,
   ],
   providers: [
     AzureConfigService,
@@ -40,6 +43,7 @@ import { RealtimeGateway } from './gateways/realtime.gateway';
     ReminderService,
     PhotoService,
     SafetyConfigService,
+    MusicService,
     RealtimeGateway,
   ],
 })

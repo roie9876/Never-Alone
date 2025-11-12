@@ -43,6 +43,8 @@ class WebSocketService extends ChangeNotifier {
   Function(ConversationTurn transcript)? onTranscriptReceived;
   Function(Map<String, dynamic> status)? onSessionStatusUpdated;
   Function(List<Map<String, dynamic>> photos)? onPhotosTriggered;
+  Function(Map<String, dynamic> musicData)? onMusicPlayback;
+  Function(String reason)? onStopMusic;
   Function(String error)? onError;
   
   // Getters
@@ -92,6 +94,14 @@ class WebSocketService extends ChangeNotifier {
   /// Set up Socket.IO event listeners
   void _setupEventListeners() {
     if (_socket == null) return;
+    
+    // 🔍 DEBUG: Catch ALL events to see what's coming through
+    _socket!.onAny((event, data) {
+      debugPrint('🌐 RAW WebSocket Event: "$event"');
+      if (event == 'stop-music') {
+        debugPrint('🎵🎵🎵 STOP-MUSIC EVENT DETECTED IN onAny!');
+      }
+    });
     
     // Connection established
     _socket!.on('connect', (_) {
@@ -178,6 +188,53 @@ class WebSocketService extends ChangeNotifier {
       } else {
         debugPrint('📷 WebSocketService: Invalid photos data format');
       }
+      
+      notifyListeners();
+    });
+    
+    // Music playback triggered by AI during conversation
+    _socket!.on('play-music', (data) {
+      debugPrint('🎵 WebSocketService: Music playback triggered');
+      debugPrint('🎵 WebSocketService: Music Service: ${data['musicService']}');
+      debugPrint('🎵 WebSocketService: Track ID: ${data['trackId']}');
+      debugPrint('🎵 WebSocketService: Title: ${data['title']}');
+      debugPrint('🎵 WebSocketService: Artist: ${data['artist']}');
+      debugPrint('🎵 WebSocketService: Reason: ${data['reason']}');
+      
+      // Handle both Spotify and YouTube formats
+      if ((data['trackId'] != null || data['videoId'] != null) && data['title'] != null) {
+        final musicData = {
+          'musicService': data['musicService'] as String? ?? 'youtube-music',
+          'trackId': data['trackId'] as String? ?? data['videoId'] as String?, // Spotify track ID or YouTube video ID
+          'videoId': data['videoId'] as String?, // Legacy YouTube support
+          'title': data['title'] as String,
+          'artist': data['artist'] as String? ?? 'Unknown Artist',
+          'reason': data['reason'] as String? ?? 'user_requested',
+          'albumArt': data['albumArt'] as String?,
+          'thumbnail': data['thumbnail'] as String?, // Legacy
+          'spotifyUrl': data['spotifyUrl'] as String?,
+          'durationMs': data['durationMs'] as int?,
+        };
+        
+        debugPrint('🎵 WebSocketService: Calling onMusicPlayback callback with ${musicData['musicService']} data');
+        onMusicPlayback?.call(musicData);
+      } else {
+        debugPrint('🎵 WebSocketService: Invalid music data format - missing trackId/videoId or title');
+      }
+      
+      notifyListeners();
+    });
+    
+    // Stop music command from AI
+    _socket!.on('stop-music', (data) {
+      debugPrint('🎵🎵🎵 WebSocketService: ===== STOP MUSIC EVENT RECEIVED =====');
+      debugPrint('🎵 WebSocketService: Raw data: $data');
+      debugPrint('🎵 WebSocketService: Reason: ${data['reason']}');
+      debugPrint('🎵 WebSocketService: Callback exists: ${onStopMusic != null}');
+      
+      // Call stop music callback
+      onStopMusic?.call(data['reason'] as String? ?? 'user requested');
+      debugPrint('🎵 WebSocketService: Callback invoked successfully');
       
       notifyListeners();
     });

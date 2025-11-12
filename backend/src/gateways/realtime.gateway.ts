@@ -366,4 +366,60 @@ export class RealtimeGateway
       timestamp: new Date().toISOString(),
     });
   }
+
+  /**
+   * Broadcast music playback to client(s) in session
+   *
+   * Called by RealtimeService when AI triggers music playback
+   */
+  broadcastMusicPlayback(
+    sessionId: string,
+    musicData: {
+      musicService: string;   // 'spotify' or 'youtube-music'
+      trackId: string;        // Spotify track ID or YouTube video ID
+      title: string;
+      artist: string;
+      albumArt?: string;      // Album artwork URL (Spotify) or thumbnail (YouTube)
+      spotifyUrl?: string;    // Spotify web URL
+      durationMs?: number;    // Track duration
+      reason: string;
+    },
+  ) {
+    this.logger.log(`🎵 Broadcasting music playback to session ${sessionId}: "${musicData.title}" by ${musicData.artist}`);
+    this.logger.log(`   Music Service: ${musicData.musicService}, Track ID: ${musicData.trackId}`);
+
+    this.server.to(sessionId).emit('play-music', {
+      sessionId,
+      musicService: musicData.musicService,
+      trackId: musicData.trackId,
+      title: musicData.title,
+      artist: musicData.artist,
+      albumArt: musicData.albumArt,
+      spotifyUrl: musicData.spotifyUrl,
+      durationMs: musicData.durationMs,
+      reason: musicData.reason,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Broadcast stop music command to client(s) in session
+   *
+   * Called by RealtimeService when AI stops music playback
+   */
+  broadcastStopMusic(
+    sessionId: string,
+    data: {
+      reason: string;
+      timestamp: string;
+    },
+  ) {
+    this.logger.log(`🎵 Broadcasting stop music to session ${sessionId}: ${data.reason}`);
+
+    this.server.to(sessionId).emit('stop-music', {
+      sessionId,
+      reason: data.reason,
+      timestamp: data.timestamp,
+    });
+  }
 }

@@ -31,6 +31,7 @@ export interface FunctionCallResult {
 export interface SystemPromptContext {
   userName: string;
   userAge: number;
+  userGender: 'male' | 'female'; // CRITICAL: Used for Hebrew grammar conjugation
   language: string;
   cognitiveMode: string;
   familyMembers: Array<{ name: string; relationship: string }>;
@@ -41,6 +42,7 @@ export interface SystemPromptContext {
     working: any;
     longTerm: any[];
   };
+  musicPreferences?: any; // Optional: User's music preferences
 }
 
 export interface AudioChunk {

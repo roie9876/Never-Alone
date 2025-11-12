@@ -353,13 +353,18 @@ Return the top ${limit} most relevant photos as JSON array.`;
 
     // Build photo trigger event
     const photoDisplay: PhotoDisplay[] = photos.map((photo) => {
-      // Convert relative URLs to absolute (for photos stored in dashboard API)
+      // Convert relative URLs to absolute
       let photoUrl = photo.blobUrl;
       if (photoUrl.startsWith('/api/photos/')) {
-        // Dashboard stores photos in Next.js API routes
+        // Photos are served by the dashboard Next.js API
         const dashboardUrl = process.env.DASHBOARD_URL || 'http://localhost:3001';
         photoUrl = `${dashboardUrl}${photoUrl}`;
-        this.logger.debug(`Converted relative URL to absolute: ${photoUrl}`);
+        this.logger.debug(`Converted dashboard relative URL to absolute: ${photoUrl}`);
+      } else if (photoUrl.startsWith('/')) {
+        // Generic relative URL - use backend URL
+        const backendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
+        photoUrl = `${backendUrl}${photoUrl}`;
+        this.logger.debug(`Converted backend relative URL to absolute: ${photoUrl}`);
       }
 
       return {

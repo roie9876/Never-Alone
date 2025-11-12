@@ -51,9 +51,37 @@ export async function POST(request: NextRequest) {
     console.log('   - Emergency contacts:', config.emergencyContacts.length);
     console.log('   - Medications:', config.medications.length);
     console.log('   - Photos:', body.photos?.length || 0);
+    console.log('   - Music preferences:', body.musicPreferences?.enabled ? 'Enabled' : 'Disabled');
 
     // Save to Cosmos DB
     const savedConfig = await saveSafetyConfig(config);
+
+    // If music preferences were configured, save them to backend
+    if (body.musicPreferences) {
+      console.log('🎵 Saving music preferences to backend...');
+      try {
+        const backendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
+        const musicResponse = await fetch(`${backendUrl}/music/preferences`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: body.userId,
+            ...body.musicPreferences,
+          }),
+        });
+
+        if (!musicResponse.ok) {
+          console.warn('⚠️ Failed to save music preferences to backend:', await musicResponse.text());
+        } else {
+          console.log('✅ Music preferences saved to Cosmos DB');
+        }
+      } catch (musicError) {
+        console.warn('⚠️ Error saving music preferences to backend:', musicError);
+        // Don't fail the whole onboarding if music preferences fail
+      }
+    }
 
     // If photos were uploaded, save them to Cosmos DB photos container
     if (body.photos && body.photos.length > 0) {

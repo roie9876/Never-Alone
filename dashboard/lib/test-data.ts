@@ -180,6 +180,17 @@ export const TIFERET_TEST_DATA: OnboardingFormSchema = {
   // Step 7: Photos (Optional - empty for test data)
   photos: [],
 
+  // Step 8: Music Preferences (Optional - NEW)
+  musicPreferences: {
+    enabled: true,
+    preferredArtists: 'נעמי שמר, אריק איינשטיין, שלום חנוך',
+    preferredSongs: 'ירושלים של זהב, אני ואתה, יושב על הגדר, שיר לשלום',
+    preferredGenres: 'Israeli classics, 1960s Hebrew songs, שירי ארץ ישראל',
+    allowAutoPlay: false,
+    playOnSadness: true,
+    maxSongsPerSession: 3,
+  },
+
   // Metadata
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
@@ -215,6 +226,15 @@ export const EMPTY_FORM_DATA: OnboardingFormSchema = {
   crisisTriggers: [],
   voiceCalibration: { enabled: false },
   photos: [],
+  musicPreferences: {
+    enabled: false,
+    preferredArtists: '',
+    preferredSongs: '',
+    preferredGenres: '',
+    allowAutoPlay: false,
+    playOnSadness: false,
+    maxSongsPerSession: 3,
+  },
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };

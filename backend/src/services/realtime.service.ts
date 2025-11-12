@@ -12,6 +12,7 @@ import { DefaultAzureCredential } from '@azure/identity';
 import { AzureConfigService } from '@config/azure.config';
 import { MemoryService } from './memory.service';
 import { PhotoService } from './photo.service';
+import { MusicService } from './music.service';
 import {
   RealtimeSession,
   RealtimeSessionConfig,
@@ -30,11 +31,20 @@ export class RealtimeService {
   private sessionWebSockets: Map<string, WebSocket> = new Map();
   private gateway: any; // Reference to RealtimeGateway (set via setGateway method)
 
+  // Photo session tracking for sequential photo display
+  private photoSessions = new Map<string, {
+    photos: any[]; // PhotoDisplay array
+    currentIndex: number;
+    timestamp: Date;
+    triggerContext: string;
+  }>();
+
   constructor(
     private configService: ConfigService,
     private azureConfig: AzureConfigService,
     private memoryService: MemoryService,
     private photoService: PhotoService,
+    private musicService: MusicService,
   ) {}
 
   /**
@@ -57,7 +67,18 @@ export class RealtimeService {
     const userProfile = await this.loadUserProfile(config.userId);
     const safetyConfig = await this.loadSafetyConfig(config.userId);
 
-    // 3. Extract user name from profile (handle both old and new schema)
+    // 3. Load music preferences (optional feature)
+    let musicPreferences = null;
+    try {
+      musicPreferences = await this.musicService.loadMusicPreferences(config.userId);
+      if (musicPreferences) {
+        this.logger.debug(`Music preferences loaded for user ${config.userId}`);
+      }
+    } catch (error) {
+      this.logger.debug(`No music preferences found for user ${config.userId}`);
+    }
+
+    // 4. Extract user name from profile (handle both old and new schema)
     const userName = userProfile?.name ||
                      userProfile?.personalInfo?.fullName ||
                      userProfile?.personalInfo?.firstName ||
@@ -67,16 +88,23 @@ export class RealtimeService {
                     userProfile?.personalInfo?.age ||
                     70;
 
-    // 4. Build system prompt with context
+    // 4a. Extract user gender for Hebrew grammar (CRITICAL for proper conjugation)
+    const userGender = userProfile?.gender ||
+                       userProfile?.personalInfo?.gender ||
+                       'male'; // Default to male if not specified
+
+    // 5. Build system prompt with context
     const systemPrompt = this.buildSystemPrompt({
       userName,
       userAge,
+      userGender,
       language: config.language || userProfile?.personalInfo?.language || 'he',
       cognitiveMode: userProfile?.cognitiveMode || 'standard',
       familyMembers: userProfile?.familyMembers || [],
       safetyRules: safetyConfig,
       medications: safetyConfig?.medications || [],
       memories,
+      musicPreferences,
     });
 
     // 4. Create session object
@@ -329,59 +357,145 @@ export class RealtimeService {
           result = { success: false, error: 'Failed to save incident' };
         }
       } else if (functionName === 'show_photos') {
-        // Trigger photo display based on conversation context
-        // 🔥 STRATEGY: Await photo query to get descriptions, but broadcast photos async
-        const photoEvent = await this.photoService.triggerPhotoDisplay(
-          session.userId,
-          args.trigger_reason as PhotoTriggerReason,
-          args.mentioned_names,
-          args.keywords,
-          args.context,
-          args.emotional_state,
-        );
+        // ===== SEQUENTIAL PHOTO DISPLAY =====
+        // Photos are shown ONE AT A TIME for proper voice/visual synchronization
+        const nextPhoto = args.next_photo || false;
 
-        if (photoEvent && photoEvent.photos.length > 0) {
-          this.logger.log(`📸 Broadcasting ${photoEvent.photos.length} photos to session ${session.id}`);
+        if (!nextPhoto) {
+          // ===== FIRST PHOTO REQUEST =====
+          this.logger.log(`📸 Starting new photo session for session ${session.id}`);
 
-          // 🎯 Broadcast photos IMMEDIATELY (synchronously) so they appear before AI speaks
-          if (this.gateway) {
-            this.gateway.broadcastPhotos(
-              session.id,
-              photoEvent.photos.map((p) => ({
-                url: p.url,
-                caption: p.caption || '',
-                taggedPeople: p.taggedPeople || [],
-                dateTaken: p.dateTaken,
-                location: p.location,
-              })),
-              args.trigger_reason,
-              args.context,
-            );
-            this.logger.log(`✅ Photos broadcast complete - AI can now describe them`);
+          const photoEvent = await this.photoService.triggerPhotoDisplay(
+            session.userId,
+            args.trigger_reason as PhotoTriggerReason,
+            args.mentioned_names,
+            args.keywords,
+            args.context,
+            args.emotional_state,
+          );
+
+          if (photoEvent && photoEvent.photos.length > 0) {
+            // Cache all photos in session state
+            this.photoSessions.set(session.id, {
+              photos: photoEvent.photos,
+              currentIndex: 0,
+              timestamp: new Date(),
+              triggerContext: args.context,
+            });
+
+            // Get first photo ONLY
+            const firstPhoto = photoEvent.photos[0];
+            this.logger.log(`📸 Showing photo 1 of ${photoEvent.photos.length}`);
+
+            // Broadcast ONLY first photo
+            if (this.gateway) {
+              this.gateway.broadcastPhotos(
+                session.id,
+                [{
+                  url: firstPhoto.url,
+                  caption: firstPhoto.caption || '',
+                  taggedPeople: firstPhoto.taggedPeople || [],
+                  dateTaken: firstPhoto.dateTaken,
+                  location: firstPhoto.location,
+                }],
+                args.trigger_reason,
+                args.context,
+              );
+              this.logger.log(`✅ First photo broadcast - AI can now describe it`);
+            }
+
+            // Return ONLY first photo description
+            const people = firstPhoto.taggedPeople && firstPhoto.taggedPeople.length > 0
+              ? firstPhoto.taggedPeople.join(', ')
+              : 'family';
+            const date = firstPhoto.dateTaken
+              ? new Date(firstPhoto.dateTaken).toLocaleDateString('he-IL')
+              : 'unknown date';
+            const loc = firstPhoto.location || 'unknown location';
+
+            result = {
+              success: true,
+              message: `Showing photo 1 of ${photoEvent.photos.length}`,
+              photos_shown: 1,
+              total_photos: photoEvent.photos.length,
+              has_more_photos: photoEvent.photos.length > 1,
+              photo_descriptions: [
+                `Photo of ${people} from ${date} at ${loc}. Caption: ${firstPhoto.caption || 'No caption'}`
+              ],
+            };
+          } else {
+            this.logger.warn(`No photos found for user ${session.userId}`);
+            result = {
+              success: false,
+              message: 'No photos found matching your request',
+              photos_shown: 0,
+              photo_descriptions: [],
+            };
           }
-
-          // Return immediately with photo descriptions so AI can talk about them
-          result = {
-            success: true,
-            message: `Found ${photoEvent.photos.length} photo(s)`,
-            photos_shown: photoEvent.photos.length,
-            photo_descriptions: photoEvent.photos.map((p) => {
-              const people = p.taggedPeople && p.taggedPeople.length > 0 ? p.taggedPeople.join(', ') : 'family';
-              const date = p.dateTaken ? new Date(p.dateTaken).toLocaleDateString('he-IL') : 'unknown date';
-              const loc = p.location || 'unknown location';
-              return `Photo of ${people} from ${date} at ${loc}. Caption: ${p.caption || 'No caption'}`;
-            }),
-            mentioned_people: args.mentioned_names || [],
-            photo_context: args.context,
-          };
         } else {
-          this.logger.warn(`No photos found for user ${session.userId}`);
-          result = {
-            success: false,
-            message: 'No photos found matching your request',
-            photos_shown: 0,
-            photo_descriptions: [],
-          };
+          // ===== NEXT PHOTO REQUEST =====
+          this.logger.log(`📸 Next photo requested for session ${session.id}`);
+
+          const sessionPhotos = this.photoSessions.get(session.id);
+
+          if (!sessionPhotos) {
+            result = {
+              success: false,
+              message: 'No active photo session. Start a new one by calling show_photos() without next_photo.',
+              photos_shown: 0,
+            };
+          } else if (sessionPhotos.currentIndex >= sessionPhotos.photos.length - 1) {
+            // No more photos
+            this.photoSessions.delete(session.id);
+            this.logger.log(`📸 All photos shown - clearing session`);
+            result = {
+              success: false,
+              message: 'No more photos to show. All photos have been displayed.',
+              photos_shown: sessionPhotos.photos.length,
+              total_photos: sessionPhotos.photos.length,
+            };
+          } else {
+            // Get next photo
+            sessionPhotos.currentIndex++;
+            const nextPhoto = sessionPhotos.photos[sessionPhotos.currentIndex];
+            this.logger.log(`📸 Showing photo ${sessionPhotos.currentIndex + 1} of ${sessionPhotos.photos.length}`);
+
+            // Broadcast next photo
+            if (this.gateway) {
+              this.gateway.broadcastPhotos(
+                session.id,
+                [{
+                  url: nextPhoto.url,
+                  caption: nextPhoto.caption || '',
+                  taggedPeople: nextPhoto.taggedPeople || [],
+                  dateTaken: nextPhoto.dateTaken,
+                  location: nextPhoto.location,
+                }],
+                'user_requested_next',
+                sessionPhotos.triggerContext,
+              );
+            }
+
+            // Return next photo description
+            const people = nextPhoto.taggedPeople && nextPhoto.taggedPeople.length > 0
+              ? nextPhoto.taggedPeople.join(', ')
+              : 'family';
+            const date = nextPhoto.dateTaken
+              ? new Date(nextPhoto.dateTaken).toLocaleDateString('he-IL')
+              : 'unknown date';
+            const loc = nextPhoto.location || 'unknown location';
+
+            result = {
+              success: true,
+              message: `Showing photo ${sessionPhotos.currentIndex + 1} of ${sessionPhotos.photos.length}`,
+              photos_shown: sessionPhotos.currentIndex + 1,
+              total_photos: sessionPhotos.photos.length,
+              has_more_photos: sessionPhotos.currentIndex < sessionPhotos.photos.length - 1,
+              photo_descriptions: [
+                `Photo of ${people} from ${date} at ${loc}. Caption: ${nextPhoto.caption || 'No caption'}`
+              ],
+            };
+          }
         }
       } else if (functionName === 'legacy_show_photos') {
         // Legacy blocking version (kept for reference, not used)
@@ -426,6 +540,59 @@ export class RealtimeService {
             message: 'No photos match the criteria or all recent photos already shown',
           };
         }
+      } else if (functionName === 'play_music') {
+        // Handle music playback request
+        const musicResult = await this.musicService.handlePlayMusic(
+          session.userId,
+          session.conversationId,
+          args,
+        );
+
+        if (musicResult.success) {
+          this.logger.log(`🎵 Playing music: ${musicResult.title} by ${musicResult.artist}`);
+          this.logger.log(`   Music Service: ${musicResult.musicService}`);
+          this.logger.log(`   Track ID: ${musicResult.trackId}`);
+          this.logger.log(`   Album Art: ${musicResult.albumArt ? 'Available' : 'Not available'}`);
+
+          // Broadcast music playback event to Flutter client
+          if (this.gateway) {
+            this.gateway.broadcastMusicPlayback(session.id, {
+              musicService: musicResult.musicService, // 'spotify' or 'youtube-music'
+              trackId: musicResult.trackId,           // Spotify track ID
+              title: musicResult.title,
+              artist: musicResult.artist,
+              albumArt: musicResult.albumArt,         // Album artwork URL
+              spotifyUrl: musicResult.spotifyUrl,     // Spotify web URL
+              durationMs: musicResult.durationMs,     // Track duration
+              reason: musicResult.reason,
+            });
+          }
+
+          result = {
+            success: true,
+            message: `Now playing: "${musicResult.title}" by ${musicResult.artist}`,
+            song_playing: musicResult.title,
+            artist: musicResult.artist,
+          };
+        } else {
+          result = musicResult;
+        }
+      } else if (functionName === 'stop_music') {
+        // Handle stop music request
+        this.logger.log(`🎵 Stopping music for session ${session.id}`);
+
+        // Broadcast stop music event to Flutter client
+        if (this.gateway) {
+          this.gateway.broadcastStopMusic(session.id, {
+            reason: args.reason || 'user requested',
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        result = {
+          success: true,
+          message: 'Music stopped',
+        };
       } else {
         result = { success: false, error: 'Unknown function' };
       }
@@ -527,7 +694,7 @@ then describe each photo using the descriptions provided. Be warm, joyful, and c
    * Build system prompt with user context and memories
    */
   private buildSystemPrompt(context: SystemPromptContext): string {
-    const { userName, userAge, language, cognitiveMode, familyMembers, medications, memories } = context;
+    const { userName, userAge, userGender, language, cognitiveMode, familyMembers, medications, memories } = context;
 
     // Format memories for prompt
     const shortTermFormatted = memories.shortTerm
@@ -546,15 +713,54 @@ then describe each photo using the descriptions provided. Be warm, joyful, and c
     // CRITICAL: Force Hebrew language for Israeli users
     const isHebrew = language === 'he' || language === 'he-IL';
 
+    // CRITICAL: Hebrew grammar gender conjugation
+    const genderHe = userGender === 'male' ? 'זכר (male)' : 'נקבה (female)';
+    const grammarExamples = userGender === 'male'
+      ? 'Use MASCULINE forms: אתה (you), הלכת (you went), רוצה (you want)'
+      : 'Use FEMININE forms: את (you), הלכת (you went), רוצה (you want)';
+
     return `You are a warm, empathetic AI companion for elderly users.
 
 # CRITICAL LANGUAGE INSTRUCTION
 ${isHebrew ? 'אתה חייב לדבר בעברית בלבד! תמיד תענה בעברית, גם אם המשתמש מדבר באנגלית.' : 'Always speak in English.'}
 ${isHebrew ? 'YOU MUST SPEAK HEBREW ONLY! Always respond in Hebrew, even if the user speaks English.' : ''}
 
+# CRITICAL HEBREW GRAMMAR INSTRUCTION (עברית בלבד!)
+${isHebrew ? `User's grammatical gender: ${genderHe}
+${userGender === 'male' ? `
+**ALWAYS use MASCULINE conjugation when addressing ${userName}:**
+- אתה (you) - NOT את
+- הלכת (you went - masculine) - NOT הלכת (feminine)
+- רוצה (you want - masculine) - NOT רוצה (feminine)
+- שמח (happy - masculine) - NOT שמחה (feminine)
+- מרגיש (feel - masculine) - NOT מרגישה (feminine)
+
+Examples:
+✅ CORRECT: "איך אתה מרגיש היום?" (How are you feeling today? - masculine)
+❌ WRONG: "איך את מרגישה היום?" (feminine form - DO NOT USE!)
+
+✅ CORRECT: "אתה רוצה לראות תמונות?" (Do you want to see photos? - masculine)
+❌ WRONG: "את רוצה לראות תמונות?" (feminine form - DO NOT USE!)
+` : `
+**ALWAYS use FEMININE conjugation when addressing ${userName}:**
+- את (you) - NOT אתה
+- הלכת (you went - feminine) - NOT הלכת (masculine)
+- רוצה (you want - feminine) - NOT רוצה (masculine)
+- שמחה (happy - feminine) - NOT שמח (masculine)
+- מרגישה (feel - feminine) - NOT מרגיש (masculine)
+
+Examples:
+✅ CORRECT: "איך את מרגישה היום?" (How are you feeling today? - feminine)
+❌ WRONG: "איך אתה מרגיש היום?" (masculine form - DO NOT USE!)
+
+✅ CORRECT: "את רוצה לראות תמונות?" (Do you want to see photos? - feminine)
+❌ WRONG: "אתה רוצה לראות תמונות?" (masculine form - DO NOT USE!)
+`}` : ''}
+
 # USER CONTEXT
 Name: ${userName}
 Age: ${userAge}
+Gender: ${genderHe}
 Language: ${isHebrew ? 'עברית (Hebrew)' : 'English'}
 Mode: ${cognitiveMode}
 Current time: ${new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })}
@@ -607,16 +813,85 @@ When calling show_photos(), specify:
 IMPORTANT BEHAVIOR:
 1. **Always call show_photos()** when user requests photos - don't check if photos exist first!
 2. **If no exact matches found**, the system will return similar family photos instead
-3. **After calling show_photos()**, you will receive photo_descriptions array in the function response
-4. **DESCRIBE EACH PHOTO OUT LOUD** using the descriptions provided:
-   - Say: "הנה תמונה יפה!" (Here's a beautiful photo!)
-   - Then describe it: "זאת תמונה של [names] מ-[date] ב-[location]"
+3. **After calling show_photos()**, you will receive the FIRST photo description only
+4. **CRITICAL: YOU RECEIVE ONLY ONE PHOTO AT A TIME** - The photo_descriptions array has exactly ONE photo:
+   - Say: "הנה תמונה יפה!" (Here's a beautiful photo! - SINGULAR, not plural תמונות!)
+   - Then describe ONLY this ONE photo: "זאת תמונה של [names] מ-[date] ב-[location]"
    - For example: "זאת תמונה של צביה ותפארת מארצות הברית בשנת 2019" (This is a photo of Tzvia and Tiferet from USA in 2019)
-   - **Speak slowly and clearly** - photos display for 10 seconds each, give user time to enjoy
-5. **Be warm and conversational** - help user reminisce: "את זוכר את היום הזה?" (Do you remember that day?)
-6. **Don't rush** - let each photo moment be special
+   - ❌ WRONG: "הנה תמונות יפות" (photos plural - DO NOT SAY THIS!)
+   - ✅ CORRECT: "הנה תמונה יפה" (photo singular)
 
-Always be warm, patient, and emotionally present.`;
+5. **MANDATORY RESPONSE TEMPLATE** - After describing each photo, follow this EXACT structure:
+
+   **Step 1:** Describe the photo: "הנה תמונה יפה! זאת תמונה של [names]..."
+
+   **Step 2:** Check has_more_photos field:
+   - If has_more_photos=true: **IMMEDIATELY** say "רוצה לראות עוד תמונה?" (Want to see another photo?)
+   - If has_more_photos=false: Say "אלו היו כל התמונות!" (Those were all the photos!)
+
+   **CRITICAL RULES:**
+   - ❌ DO NOT skip step 2 - you MUST ask about more photos!
+   - ❌ DO NOT wait for user to ask - YOU ask first!
+   - ❌ DO NOT say "let me know if you want more" - actively ASK them!
+   - ✅ ALWAYS end your response with the question "רוצה לראות עוד תמונה?"
+
+   **Example full response:**
+   "הנה תמונה יפה! זאת תמונה של מיכל ושקד מהיום. נראה שהייתם ביחד. רוצה לראות עוד תמונה?"
+
+6. **If user says yes (כן, בסדר, sure, ok, yes)**, immediately call show_photos() with next_photo=true to get the next photo
+
+7. **Be warm and conversational** - help user reminisce: "את זוכר את היום הזה?" (Do you remember that day?)
+
+8. **Don't rush** - let each photo moment be special, one at a time
+
+🚨 CRITICAL: Photos are shown ONE AT A TIME. Your voice description MUST match the single photo currently displayed.
+
+Always be warm, patient, and emotionally present.
+
+# MUSIC PLAYBACK
+${context.musicPreferences ? this.formatMusicPreferences(context.musicPreferences) : 'Music feature not configured for this user.'}
+`;
+  }
+
+  /**
+   * Format music preferences for system prompt
+   */
+  private formatMusicPreferences(prefs: any): string {
+    if (!prefs.enabled) return 'Music feature is disabled for this user.';
+
+    const rules: string[] = [];
+
+    rules.push(`User has music enabled with these preferences:
+- Preferred artists: ${prefs.preferredArtists?.join(', ') || 'None specified'}
+- Preferred songs: ${prefs.preferredSongs?.join(', ') || 'None specified'}
+- Genres: ${prefs.preferredGenres?.join(', ') || 'None specified'}`);
+
+    rules.push(`\nYou can play music by calling play_music() function when:
+1. User explicitly requests ("play me a song", "תנגן לי מוזיקה", "I want to hear music")
+2. User expresses sadness or loneliness (${prefs.playOnSadness ? 'ENABLED ✅' : 'DISABLED ❌'})
+3. Celebrating positive moments ("Let's celebrate with a song!")
+4. ${prefs.allowAutoPlay ? 'You can suggest music proactively ✅' : 'ONLY play when user asks ❌'}`);
+
+    rules.push(`\nYou can STOP music by calling stop_music() function when:
+1. User asks to stop: "עצור את המוזיקה" (stop the music), "די" (enough), "תפסיק" (stop)
+2. User wants to talk seriously or needs focus
+3. User seems bothered by the music`);
+
+    rules.push(`\nIMPORTANT MUSIC BEHAVIOR:
+- ${prefs.allowAutoPlay ? 'You MAY suggest music without being asked' : 'Always ask permission BEFORE playing music'}
+- Use familiar songs from their preferred list when possible
+- After playing, ask if they enjoyed it: "אהבת את השיר?" (Did you like the song?)
+- Limit: ${prefs.maxSongsPerSession || 3} songs per conversation
+- If user asks to stop, IMMEDIATELY call stop_music() - don't continue the conversation until music is stopped
+
+EXAMPLE FLOW (User is sad):
+User: "אני מרגיש עצוב" (I feel sad)
+You: "אני שומע שאתה עצוב. אולי מוזיקה תעזור? יש לי '${prefs.preferredSongs?.[0] || 'שיר יפה'}', אתה אוהב את השיר הזה."
+User: "כן בבקשה" (Yes please)
+You: [Call play_music({ song_identifier: "${prefs.preferredSongs?.[0] || 'Israeli classics'}", reason: "sadness_detected", search_type: "specific_song" })]
+You: "הנה השיר! מקווה שזה ישפר לך את מצב הרוח." (Here's the song! Hope it improves your mood.)`);
+
+    return rules.join('\n');
   }
 
   /**
@@ -727,7 +1002,7 @@ Always be warm, patient, and emotionally present.`;
       {
         type: 'function',
         name: 'show_photos',
-        description: 'Show family photos to user when contextually appropriate during conversation. Use when user mentions family members, expresses sadness/loneliness, or explicitly requests photos.',
+        description: 'Show ONE family photo at a time. Call this ONCE to show first photo. After user responds, call AGAIN with next_photo=true to show the next photo. Photos are shown sequentially, not all at once.',
         parameters: {
           type: 'object',
           properties: {
@@ -760,8 +1035,52 @@ Always be warm, patient, and emotionally present.`;
               enum: ['neutral', 'sad', 'happy', 'confused', 'anxious'],
               description: "User's current emotional state (if detectable)",
             },
+            next_photo: {
+              type: 'boolean',
+              description: 'Set to true when user wants to see the next photo (after viewing first photo)',
+            },
           },
           required: ['trigger_reason', 'context'],
+        },
+      },
+      {
+        type: 'function',
+        name: 'play_music',
+        description: 'Play a song for the user from their preferred music library. Use when user requests music or when music would improve their mood (sadness, loneliness, celebration).',
+        parameters: {
+          type: 'object',
+          properties: {
+            song_identifier: {
+              type: 'string',
+              description: 'Song name, artist name, or genre to search for. Examples: "ירושלים של זהב", "Naomi Shemer", "Israeli classics"',
+            },
+            reason: {
+              type: 'string',
+              enum: ['user_requested', 'sadness_detected', 'celebration', 'background_music'],
+              description: 'Why are we playing music now?',
+            },
+            search_type: {
+              type: 'string',
+              enum: ['specific_song', 'artist', 'genre'],
+              description: 'What type of search to perform',
+            },
+          },
+          required: ['song_identifier', 'reason', 'search_type'],
+        },
+      },
+      {
+        type: 'function',
+        name: 'stop_music',
+        description: 'Stop the currently playing music. Use when user explicitly asks to stop/pause music or wants silence.',
+        parameters: {
+          type: 'object',
+          properties: {
+            reason: {
+              type: 'string',
+              description: 'Why music is being stopped (e.g., "user requested", "conversation needs focus")',
+            },
+          },
+          required: [],
         },
       },
     ];
