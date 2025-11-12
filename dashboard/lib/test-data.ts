@@ -177,6 +177,9 @@ export const TIFERET_TEST_DATA: OnboardingFormSchema = {
     enabled: false,
   },
 
+  // Step 7: Photos (Optional - empty for test data)
+  photos: [],
+
   // Metadata
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
@@ -211,6 +214,7 @@ export const EMPTY_FORM_DATA: OnboardingFormSchema = {
   },
   crisisTriggers: [],
   voiceCalibration: { enabled: false },
+  photos: [],
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };

@@ -442,23 +442,23 @@ export class RealtimeService {
             output: JSON.stringify(result),
           },
         };
-        
+
         this.logger.debug(`📤 Sending function result for ${functionName}: ${JSON.stringify(result).substring(0, 200)}...`);
         ws.send(JSON.stringify(functionOutput));
         this.logger.debug(`✅ Function result sent to Realtime API`);
-        
+
         // Step 2: Tell AI to generate response using the function output
         // Add instructions to describe photos warmly and enthusiastically
         const responseCreate = {
           type: 'response.create',
           response: {
             modalities: ['audio', 'text'],
-            instructions: `The photos are now displaying on screen. Describe them warmly and enthusiastically! 
-Start with an excited greeting like "הנה תמונות יפות!" (Here are beautiful photos!), 
+            instructions: `The photos are now displaying on screen. Describe them warmly and enthusiastically!
+Start with an excited greeting like "הנה תמונות יפות!" (Here are beautiful photos!),
 then describe each photo using the descriptions provided. Be warm, joyful, and conversational.`,
           },
         };
-        
+
         this.logger.debug(`🎤 Requesting AI response after function call`);
         ws.send(JSON.stringify(responseCreate));
       } else {

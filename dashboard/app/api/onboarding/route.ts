@@ -50,9 +50,38 @@ export async function POST(request: NextRequest) {
     console.log('   - Patient:', config.patientBackground.fullName);
     console.log('   - Emergency contacts:', config.emergencyContacts.length);
     console.log('   - Medications:', config.medications.length);
+    console.log('   - Photos:', body.photos?.length || 0);
 
     // Save to Cosmos DB
     const savedConfig = await saveSafetyConfig(config);
+
+    // If photos were uploaded, save them to Cosmos DB photos container
+    if (body.photos && body.photos.length > 0) {
+      console.log('📸 Saving photos to Cosmos DB...');
+      try {
+        // Call backend API to save photos
+        const backendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
+        const photosResponse = await fetch(`${backendUrl}/photo/bulk`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: body.userId,
+            photos: body.photos,
+          }),
+        });
+
+        if (!photosResponse.ok) {
+          console.warn('⚠️ Failed to save photos to backend:', await photosResponse.text());
+        } else {
+          console.log('✅ Photos saved to Cosmos DB');
+        }
+      } catch (photoError) {
+        console.warn('⚠️ Error saving photos to backend:', photoError);
+        // Don't fail the whole onboarding if photos fail
+      }
+    }
 
     if (!savedConfig) {
       throw new Error('Failed to save configuration - no data returned');

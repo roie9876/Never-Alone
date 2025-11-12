@@ -54,7 +54,7 @@ export class PhotoService {
           return `ARRAY_CONTAINS(p.manualTags, @person${index}, true)`;
         });
         query += ` AND (${tagConditions.join(' OR ')})`;
-        
+
         this.logger.debug(`✅ Filtering by specific people: ${options.taggedPeople.join(', ')} - ignoring generic keywords`);
       }
       // Only apply keyword filters if NO specific people mentioned
@@ -69,7 +69,7 @@ export class PhotoService {
           return `(ARRAY_CONTAINS(p.manualTags, ${paramNameExact}, true) OR ARRAY_CONTAINS(p.manualTags, ${paramNameLower}, true) OR CONTAINS(LOWER(p.caption), ${paramNameLower}))`;
         });
         query += ` AND (${keywordConditions.join(' OR ')})`;
-        
+
         this.logger.debug(`✅ Filtering by keywords: ${options.keywords.join(', ')}`);
       }
 
@@ -114,11 +114,11 @@ export class PhotoService {
   /**
    * 🆕 SEMANTIC PHOTO SEARCH using GPT-4
    * Uses AI to understand the semantic meaning of user request and match with photo metadata
-   * 
+   *
    * Example: User says "טיול באיטליה" (trip to Italy)
    * - Traditional search: looks for exact tags "איטליה" or "italy" → FAILS
    * - Semantic search: GPT-4 understands "ונציה" (Venice) IS in Italy → SUCCESS!
-   * 
+   *
    * @param userId - User ID
    * @param userRequest - Natural language request (e.g., "show me photos from Italy trip")
    * @param mentionedNames - Optional: specific people mentioned
@@ -156,7 +156,7 @@ export class PhotoService {
         const caption = photo.caption || 'No caption';
         const location = photo.location || 'Unknown location';
         const date = photo.capturedDate ? new Date(photo.capturedDate).toLocaleDateString('he-IL') : 'Unknown date';
-        
+
         return `Photo ${index + 1} (ID: ${photo.id}):
   Caption: ${caption}
   Tags: ${tags}
@@ -303,7 +303,7 @@ Return the top ${limit} most relevant photos as JSON array.`;
     // 🆕 NEW APPROACH: Use GPT-4 semantic search for better matching
     // Build natural language search query from context
     let searchQuery = '';
-    
+
     if (context && context.trim().length > 0) {
       // Use the conversation context as search query
       searchQuery = context;
@@ -326,7 +326,7 @@ Return the top ${limit} most relevant photos as JSON array.`;
     // Fallback to traditional search if semantic search fails
     if (photos.length === 0) {
       this.logger.warn(`⚠️ Semantic search returned no results. Falling back to traditional search...`);
-      
+
       const queryOptions: PhotoQueryOptions = {
         excludeRecentlyShown: true,
         limit: 5,

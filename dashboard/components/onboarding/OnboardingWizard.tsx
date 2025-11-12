@@ -17,6 +17,7 @@ import Step2Medications from './Step2Medications';
 import Step3DailyRoutines from './Step3DailyRoutines';
 import Step4ConversationBoundaries from './Step4ConversationBoundaries';
 import Step5CrisisTriggers from './Step5CrisisTriggers';
+import Step8PhotoUpload from './Step8PhotoUpload';
 import Step7Review from './Step7Review';
 
 const steps = [
@@ -27,7 +28,8 @@ const steps = [
   { id: 4, name: 'Conversation Boundaries', component: Step4ConversationBoundaries },
   { id: 5, name: 'Crisis Triggers', component: Step5CrisisTriggers },
   { id: 6, name: 'Voice Calibration', component: null }, // Deferred for MVP
-  { id: 7, name: 'Review & Confirm', component: Step7Review },
+  { id: 7, name: 'Family Photos', component: Step8PhotoUpload }, // NEW: Photo Upload
+  { id: 8, name: 'Review & Confirm', component: Step7Review },
 ];
 
 export default function OnboardingWizard() {
@@ -84,14 +86,16 @@ export default function OnboardingWizard() {
     if (currentStep === 6) {
       // Skip voice calibration for MVP
       setCurrentStep(7);
-    } else if (currentStep < 7) {
+    } else if (currentStep < 8) {
       setCurrentStep(currentStep + 1);
     }
   };
 
   const prevStep = () => {
-    if (currentStep === 7) {
-      setCurrentStep(5); // Skip voice calibration on back
+    if (currentStep === 8) {
+      setCurrentStep(7); // From Review back to Photos
+    } else if (currentStep === 7) {
+      setCurrentStep(5); // From Photos skip voice calibration back to Crisis Triggers
     } else if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
     }
@@ -119,6 +123,7 @@ export default function OnboardingWizard() {
         routines: data.routines,
         boundaries: data.boundaries,
         crisisTriggers: data.crisisTriggers,
+        photos: data.photos || [], // Include photos (optional)
         yamlConfig,
         createdAt: data.createdAt,
         updatedAt: new Date().toISOString(),
@@ -218,12 +223,12 @@ export default function OnboardingWizard() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-3xl font-bold text-gray-900">Safety Configuration</h1>
-            <span className="text-sm text-gray-600">Step {currentStep + 1} of 8</span>
+            <span className="text-sm text-gray-600">Step {currentStep + 1} of 9</span>
           </div>
           <div className="relative">
             <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200">
               <div
-                style={{ width: `${((currentStep + 1) / 8) * 100}%` }}
+                style={{ width: `${((currentStep + 1) / 9) * 100}%` }}
                 className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-600 transition-all duration-300"
               />
             </div>

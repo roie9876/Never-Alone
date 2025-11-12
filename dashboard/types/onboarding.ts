@@ -44,6 +44,16 @@ export interface PatientBackground {
   importantMemories?: string;
 }
 
+export interface Photo {
+  id: string;
+  fileName: string;
+  blobUrl: string;
+  uploadedAt: string;
+  manualTags: string[]; // Names of people in photo
+  caption?: string;
+  size: number; // File size in bytes
+}
+
 export interface OnboardingFormData {
   userId: string;
   
@@ -69,6 +79,9 @@ export interface OnboardingFormData {
   voiceCalibration?: {
     enabled: boolean;
   };
+  
+  // Step 7: Photos (NEW)
+  photos: Photo[];
   
   // Metadata
   createdAt: string;

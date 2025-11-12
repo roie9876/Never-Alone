@@ -52,6 +52,17 @@ export const crisisTriggerSchema = z.object({
   action: z.string().min(10, 'Action description must be at least 10 characters'),
 });
 
+// Photo Schema (Optional - for family photos)
+export const photoSchema = z.object({
+  id: z.string(),
+  fileName: z.string(),
+  blobUrl: z.string().min(1, 'Photo URL is required'), // Accept both full URLs and relative paths
+  uploadedAt: z.string().min(1, 'Upload timestamp is required'), // Accept any ISO string format
+  manualTags: z.array(z.string()),
+  caption: z.string().optional(),
+  size: z.number().positive('File size must be positive'),
+});
+
 // Complete Onboarding Form Schema
 export const onboardingFormSchema = z.object({
   userId: z.string().min(3, 'User ID must be at least 3 characters'),
@@ -66,6 +77,7 @@ export const onboardingFormSchema = z.object({
   voiceCalibration: z.object({
     enabled: z.boolean(),
   }).optional(),
+  photos: z.array(photoSchema).max(20, 'Maximum 20 photos allowed').optional().default([]), // NEW: Family photos (optional)
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

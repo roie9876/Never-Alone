@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../models/conversation_turn.dart';
@@ -24,6 +25,9 @@ class WebSocketService extends ChangeNotifier {
   bool _isInSession = false;
   String? _sessionId;
   String? _clientId;
+  
+  // Session readiness (WebSocket to Azure OpenAI connected)
+  Completer<void>? _sessionReadyCompleter;
   
   // Transcript history
   final List<ConversationTurn> _transcripts = [];
@@ -178,6 +182,18 @@ class WebSocketService extends ChangeNotifier {
       notifyListeners();
     });
     
+    // Session ready - Backend WebSocket to Azure OpenAI is connected
+    _socket!.on('session-ready', (data) {
+      debugPrint('🎤 WebSocketService: Session ready signal received: $data');
+      
+      if (_sessionReadyCompleter != null && !_sessionReadyCompleter!.isCompleted) {
+        _sessionReadyCompleter!.complete();
+        debugPrint('🎤 WebSocketService: Session ready completer completed');
+      }
+      
+      notifyListeners();
+    });
+    
     // Error from server
     _socket!.on('error', (data) {
       final errorMsg = data['message'] ?? 'Unknown error';
@@ -204,9 +220,47 @@ class WebSocketService extends ChangeNotifier {
     
     debugPrint('WebSocketService: Joining session $sessionId');
     
+    // Reset session ready completer for new session
+    _sessionReadyCompleter = Completer<void>();
+    debugPrint('WebSocketService: Created new session ready completer');
+    
     _socket!.emit('join-session', {
       'sessionId': sessionId,
     });
+  }
+  
+  /// Wait for backend to signal that Azure OpenAI WebSocket is ready
+  /// 
+  /// This ensures the WebSocket connection to Azure is established before
+  /// we start sending audio chunks. Backend emits 'session-ready' when connected.
+  /// 
+  /// [timeout] - Maximum time to wait (default: 10 seconds)
+  /// 
+  /// Throws [TimeoutException] if session doesn't become ready within timeout
+  Future<void> waitForSessionReady({Duration timeout = const Duration(seconds: 10)}) async {
+    if (_sessionReadyCompleter == null) {
+      debugPrint('WebSocketService: ⚠️ No session ready completer - creating one');
+      _sessionReadyCompleter = Completer<void>();
+    }
+    
+    if (_sessionReadyCompleter!.isCompleted) {
+      debugPrint('WebSocketService: Session already ready');
+      return;
+    }
+    
+    debugPrint('WebSocketService: ⏳ Waiting for session ready signal (timeout: ${timeout.inSeconds}s)...');
+    
+    try {
+      await _sessionReadyCompleter!.future.timeout(timeout);
+      debugPrint('WebSocketService: ✅ Session ready signal received!');
+    } on TimeoutException {
+      final error = 'Session ready timeout after ${timeout.inSeconds} seconds';
+      debugPrint('WebSocketService: ❌ $error');
+      throw Exception(error);
+    } catch (e) {
+      debugPrint('WebSocketService: ❌ Error waiting for session ready: $e');
+      rethrow;
+    }
   }
   
   /// Send audio chunk to backend
@@ -271,6 +325,7 @@ class WebSocketService extends ChangeNotifier {
     _isInSession = false;
     _sessionId = null;
     _clientId = null;
+    _sessionReadyCompleter = null;
     _aiAudioChunks.clear();
     
     notifyListeners();

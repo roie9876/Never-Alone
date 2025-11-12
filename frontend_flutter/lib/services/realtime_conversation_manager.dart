@@ -183,10 +183,12 @@ class RealtimeConversationManager extends ChangeNotifier {
       // 3. Join the session via WebSocket
       await _websocketService.joinSession(_activeSessionId!);
       
-      // Wait for backend WebSocket to Azure to be fully ready
-      // (Backend needs time to establish Azure OpenAI connection)
-      // Reduced from 2000ms to 1000ms for faster response
-      await Future.delayed(const Duration(milliseconds: 1000));
+      // 🎯 Wait for backend to signal that Azure OpenAI WebSocket is ready
+      // Backend emits 'session-ready' event when WebSocket connection established
+      // This prevents "Failed to send audio" errors from sending too early
+      debugPrint('RealtimeConversationManager: ⏳ Waiting for session ready signal...');
+      await _websocketService.waitForSessionReady();
+      debugPrint('RealtimeConversationManager: ✅ Session ready! Starting audio recording...');
       
       // 4. Start audio recording
       await _audioService.startRecording();
