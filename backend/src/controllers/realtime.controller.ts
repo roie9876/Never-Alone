@@ -87,6 +87,34 @@ export class RealtimeController {
   }
 
   /**
+   * Get all active sessions
+   *
+   * GET /realtime/sessions
+   *
+   * Returns: { sessions: RealtimeSession[] }
+   */
+  @Get('sessions')
+  async getAllSessions(): Promise<{ sessions: RealtimeSession[] }> {
+    try {
+      this.logger.log('Getting all active sessions');
+
+      const sessions = await this.realtimeService.getAllSessions();
+
+      return { sessions };
+    } catch (error) {
+      this.logger.error(
+        `Failed to get active sessions: ${error.message}`,
+        error.stack,
+      );
+
+      throw new HttpException(
+        'Failed to get active sessions',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
    * Get session status and metadata
    *
    * GET /realtime/session/:id
@@ -176,6 +204,42 @@ export class RealtimeController {
       status: 'ok',
       message: 'Realtime API controller is running',
     };
+  }
+
+  /**
+   * Refresh system prompt for active session
+   * Call this after updating user profile/preferences in dashboard
+   *
+   * POST /realtime/session/:sessionId/refresh
+   *
+   * Returns: { success: boolean, message: string }
+   */
+  @Post('session/:sessionId/refresh')
+  async refreshSystemPrompt(
+    @Param('sessionId') sessionId: string,
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      this.logger.log(`Refreshing system prompt for session: ${sessionId}`);
+
+      const result = await this.realtimeService.refreshSystemPrompt(sessionId);
+
+      this.logger.log(`System prompt refreshed successfully for session: ${sessionId}`);
+      return result;
+    } catch (error) {
+      this.logger.error(
+        `Failed to refresh system prompt: ${error.message}`,
+        error.stack,
+      );
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        error.message || 'Failed to refresh system prompt',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   /**

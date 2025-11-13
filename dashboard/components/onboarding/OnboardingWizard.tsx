@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { v4 as uuidv4 } from 'uuid';
@@ -41,6 +41,7 @@ export default function OnboardingWizard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [useTestData, setUseTestData] = useState(true); // Default to test data for easier testing
+  const [isLoading, setIsLoading] = useState(true); // Loading state for data fetch
 
   // Get initial values based on test data toggle
   const getInitialValues = () => {
@@ -56,7 +57,41 @@ export default function OnboardingWizard() {
     mode: 'onBlur',
   });
 
-  const { handleSubmit, trigger } = methods;
+  const { handleSubmit, trigger, reset } = methods;
+
+  // Load existing data from API on mount
+  useEffect(() => {
+    async function loadExistingData() {
+      try {
+        console.log('🔄 Loading existing configuration...');
+        setIsLoading(true);
+        
+        // Try to load data for Tiferet (default test user)
+        const userId = 'user-tiferet-001';
+        const response = await fetch(`/api/onboarding/${userId}`);
+        
+        if (response.ok) {
+          const { data } = await response.json();
+          console.log('✅ Loaded existing configuration from Cosmos DB');
+          console.log('   Music preferences:', data.musicPreferences);
+          
+          // Reset form with loaded data
+          reset(data);
+          setUseTestData(false); // Mark as real data, not test data
+        } else {
+          console.log('⚠️ No existing configuration found, using test data');
+          // Keep test data as fallback
+        }
+      } catch (error) {
+        console.error('❌ Error loading configuration:', error);
+        // Keep test data as fallback
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadExistingData();
+  }, [reset]);
 
   const nextStep = async () => {
     let fieldsToValidate: (keyof OnboardingFormSchema)[] = [];
@@ -308,10 +343,20 @@ export default function OnboardingWizard() {
           </div>
         </div>
 
+        {/* Loading State */}
+        {isLoading && (
+          <div className="bg-white shadow-md rounded-lg p-12 text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 text-lg">טוען הגדרות קיימות...</p>
+            <p className="text-gray-400 text-sm mt-2">אנא המתן</p>
+          </div>
+        )}
+
         {/* Form */}
-        <FormProvider {...methods}>
-          <form onSubmit={handleSubmit(onSubmit)} className="bg-white shadow-md rounded-lg p-6">
-            {currentStep === 6 ? (
+        {!isLoading && (
+          <FormProvider {...methods}>
+            <form onSubmit={handleSubmit(onSubmit)} className="bg-white shadow-md rounded-lg p-6">
+              {currentStep === 6 ? (
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">כיול קול</h2>
@@ -387,6 +432,7 @@ export default function OnboardingWizard() {
             </div>
           </form>
         </FormProvider>
+        )}
       </div>
     </div>
   );

@@ -1197,4 +1197,96 @@ You: "הנה השיר! מקווה שזה ישפר לך את מצב הרוח." (H
       type: 'response.cancel',
     }));
   }
+
+  /**
+   * Get all active sessions
+   * Returns array of all sessions currently in memory
+   */
+  async getAllSessions(): Promise<RealtimeSession[]> {
+    return Array.from(this.activeSessions.values());
+  }
+
+  /**
+   * Refresh system prompt for active session (reload profile, safety config, music preferences)
+   * Call this after user updates their profile in the dashboard
+   */
+  async refreshSystemPrompt(sessionId: string): Promise<{ success: boolean; message: string }> {
+    this.logger.log(`🔄 Refreshing system prompt for session: ${sessionId}`);
+
+    const session = this.activeSessions.get(sessionId);
+    if (!session) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+
+    const ws = this.sessionWebSockets.get(sessionId);
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      throw new Error(`Session ${sessionId} has no active WebSocket connection`);
+    }
+
+    try {
+      // 1. Reload all memory tiers
+      const memories = await this.memoryService.loadMemory(session.userId);
+
+      // 2. Reload user profile and safety config
+      const userProfile = await this.loadUserProfile(session.userId);
+      const safetyConfig = await this.loadSafetyConfig(session.userId);
+
+      // 3. Reload music preferences
+      let musicPreferences = null;
+      try {
+        musicPreferences = await this.musicService.loadMusicPreferences(session.userId);
+        if (musicPreferences) {
+          this.logger.debug(`✅ Music preferences reloaded for user ${session.userId}`);
+        }
+      } catch (error) {
+        this.logger.debug(`No music preferences found for user ${session.userId}`);
+      }
+
+      // 4. Extract user info
+      const userName = userProfile?.name ||
+                       userProfile?.personalInfo?.fullName ||
+                       userProfile?.personalInfo?.firstName ||
+                       'User';
+
+      const userAge = userProfile?.age ||
+                      userProfile?.personalInfo?.age ||
+                      70;
+
+      const userGender = userProfile?.gender ||
+                         userProfile?.personalInfo?.gender ||
+                         'male';
+
+      // 5. Rebuild system prompt with updated context
+      const systemPrompt = this.buildSystemPrompt({
+        userName,
+        userAge,
+        userGender,
+        language: userProfile?.personalInfo?.language || 'he',
+        cognitiveMode: userProfile?.cognitiveMode || 'standard',
+        familyMembers: userProfile?.familyMembers || [],
+        safetyRules: safetyConfig,
+        medications: safetyConfig?.medications || [],
+        memories,
+        musicPreferences,
+      });
+
+      // 6. Send session.update to Azure OpenAI to refresh the instructions
+      ws.send(JSON.stringify({
+        type: 'session.update',
+        session: {
+          instructions: systemPrompt,
+        },
+      }));
+
+      this.logger.log(`✅ System prompt refreshed for session ${sessionId}`);
+
+      return {
+        success: true,
+        message: 'System prompt refreshed successfully. New preferences will take effect immediately.',
+      };
+    } catch (error) {
+      this.logger.error(`Failed to refresh system prompt: ${error.message}`);
+      throw new Error(`Failed to refresh system prompt: ${error.message}`);
+    }
+  }
 }

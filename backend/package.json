@@ -18,7 +18,8 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "check:containers": "node scripts/check-containers.js",
-    "generate:audio": "ts-node scripts/generate-audio.ts"
+    "generate:audio": "ts-node scripts/generate-audio.ts",
+    "refresh:session": "node refresh-active-session.js"
   },
   "dependencies": {
     "@azure/cosmos": "^4.0.0",

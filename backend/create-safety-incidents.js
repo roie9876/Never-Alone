@@ -10,9 +10,9 @@ const client = new CosmosClient({
 async function createSafetyIncidents() {
   try {
     const database = client.database('never-alone');
-    
+
     console.log('📦 Creating SafetyIncidents container...');
-    
+
     const { container } = await database.containers.createIfNotExists({
       id: 'SafetyIncidents',
       partitionKey: {
@@ -20,12 +20,12 @@ async function createSafetyIncidents() {
         version: 2
       }
     });
-    
+
     console.log('✅ SafetyIncidents container created!');
-    
+
     // Create 2 test incidents
     console.log('\n🚨 Creating test safety incidents...');
-    
+
     const incidents = [
       {
         id: 'alert-001',
@@ -55,7 +55,7 @@ async function createSafetyIncidents() {
         resolvedAt: new Date().toISOString(),
       },
     ];
-    
+
     for (const incident of incidents) {
       try {
         await container.items.create(incident);
@@ -68,9 +68,9 @@ async function createSafetyIncidents() {
         }
       }
     }
-    
+
     console.log('\n✅ All done! Test data ready.');
-    
+
   } catch (err) {
     console.error('❌ Error:', err.message);
   }

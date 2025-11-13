@@ -10,7 +10,7 @@ const client = new CosmosClient({
 async function createDashboardContainers() {
   try {
     const database = client.database('never-alone');
-    
+
     // 1. Create Conversations container (PascalCase)
     console.log('📦 Creating Conversations container...');
     const { container: conversationsContainer } = await database.containers.createIfNotExists({
@@ -18,7 +18,7 @@ async function createDashboardContainers() {
       partitionKey: { paths: ['/userId'], version: 2 }
     });
     console.log('✅ Conversations container created!');
-    
+
     // 2. Create Reminders container (PascalCase)
     console.log('📦 Creating Reminders container...');
     const { container: remindersContainer } = await database.containers.createIfNotExists({
@@ -26,7 +26,7 @@ async function createDashboardContainers() {
       partitionKey: { paths: ['/userId'], version: 2 }
     });
     console.log('✅ Reminders container created!');
-    
+
     // 3. Add test data
     console.log('\n💬 Creating test conversations...');
     const today = new Date();
@@ -50,7 +50,7 @@ async function createDashboardContainers() {
         durationSeconds: 720,
       },
     ];
-    
+
     for (const conv of conversations) {
       try {
         await conversationsContainer.items.create(conv);
@@ -63,7 +63,7 @@ async function createDashboardContainers() {
         }
       }
     }
-    
+
     console.log('\n💊 Creating test reminders...');
     const todayStr = new Date().toISOString().split('T')[0];
     const reminders = [
@@ -105,7 +105,7 @@ async function createDashboardContainers() {
         declineCount: 2,
       },
     ];
-    
+
     for (const reminder of reminders) {
       try {
         await remindersContainer.items.create(reminder);
@@ -118,9 +118,9 @@ async function createDashboardContainers() {
         }
       }
     }
-    
+
     console.log('\n✅ All done! Dashboard should now show real data.');
-    
+
   } catch (err) {
     console.error('❌ Error:', err.message);
   }

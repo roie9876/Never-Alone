@@ -12,7 +12,7 @@ async function checkFamilyMembers() {
 
     const container = client.database('never-alone').container('FamilyMembers');
     const { resources } = await container.items.query('SELECT * FROM c').fetchAll();
-    
+
     console.log('📋 Total FamilyMembers:', resources.length);
     console.log('\n📧 Family Member Records:');
     resources.forEach(fm => {

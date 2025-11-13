@@ -820,18 +820,6 @@ end tell
           ),
           
           const Spacer(flex: 2),
-          
-          // Settings button at bottom
-          Padding(
-            padding: const EdgeInsets.only(bottom: 40),
-            child: IconButton(
-              icon: const Icon(Icons.settings_outlined, size: 36),
-              color: const Color(0xFF95A5A6),
-              onPressed: () {
-                // Navigate to settings
-              },
-            ),
-          ),
         ],
       ),
     );
