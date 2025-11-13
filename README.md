@@ -144,12 +144,7 @@ Never Alone is a **wellbeing and companion app** focused on emotional support. I
 
 ---
 
-## 📞 Contact
 
-For inquiries about partnerships, investment, or collaboration:
-- **Email:** [your-email@example.com]
-- **Website:** [Coming Soon]
 
----
 
 *Last Updated: November 9, 2025*
