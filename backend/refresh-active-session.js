@@ -2,13 +2,13 @@
 
 /**
  * Refresh System Prompt for Active Session
- * 
+ *
  * Run this script after updating user profile/music preferences in the dashboard
  * to reload the system prompt without restarting the conversation.
- * 
+ *
  * Usage:
  *   node refresh-active-session.js [sessionId]
- * 
+ *
  * If no sessionId provided, will attempt to find active session for user-tiferet-001
  */
 
@@ -74,7 +74,7 @@ async function refreshSession(sessionId) {
 
       res.on('end', () => {
         console.log(`Response status: ${res.statusCode}`);
-        
+
         if (res.statusCode === 200 || res.statusCode === 201) {
           try {
             const result = JSON.parse(data);
@@ -105,9 +105,9 @@ async function main() {
   try {
     if (!sessionId) {
       console.log('No sessionId provided. Looking for active sessions...\n');
-      
+
       const sessions = await findActiveSessions();
-      
+
       if (sessions.length === 0) {
         console.log('❌ No active sessions found.');
         console.log('\nℹ️  Start a conversation in the Flutter app first, then run:');
