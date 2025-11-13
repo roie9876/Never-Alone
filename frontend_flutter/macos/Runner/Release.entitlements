@@ -12,5 +12,14 @@
 	<true/>
 	<key>com.apple.security.device.camera</key>
 	<true/>
+	<!-- FILE ACCESS (for audio playback) -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<!-- AUTOMATION PERMISSIONS (allow AppleScript control of Spotify) -->
+	<key>com.apple.security.automation.apple-events</key>
+	<dict>
+		<key>com.spotify.client</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

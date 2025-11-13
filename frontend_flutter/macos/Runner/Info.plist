@@ -32,5 +32,7 @@
 	<string>Never Alone needs microphone access to hear your voice and have conversations with you.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Never Alone may use the camera for future video features.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Never Alone needs permission to control Spotify so it can start and stop music during conversations.</string>
 </dict>
 </plist>

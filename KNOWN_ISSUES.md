@@ -7,13 +7,103 @@
 
 ## 🔴 Critical Issues
 
-*None found yet*
+### Issue #1: Spotify Stop Music Fails - Automation Prompt Never Appears
+**Discovered:** November 13, 2025 during music integration testing  
+**Severity:** Critical (Blocks MVP music feature)  
+**Component:** Music Playback (Spotify Integration)
+
+**Description:**
+When Spotify is launched via AppleScript URI scheme (`play track "spotify:track:XXX"`), subsequent AppleScript commands to pause/stop the music fail with "Application isn't running (-600)". macOS never shows the Automation permission prompt even after migrating to native `NSAppleScript` via MethodChannel, adding entitlements, and resetting TCC.
+
+**Technical Details:**
+- Music **starts** successfully: Spotify opens and plays the requested track ✅
+- Music **cannot be stopped** from Flutter: All AppleScript pause/quit commands return `ERR:-600` ❌
+- Automation prompt **never appears**: System Settings → Privacy & Security → Automation does not list "never_alone_app"
+- WebSocket pipeline works correctly: Backend → Flutter → `_stopSpotifyPlayback()` all execute as expected
+
+**Root Cause:**
+When Spotify is opened via AppleScript `play track` with a URI:
+1. The process launches and music plays
+2. AppleScript does NOT register Spotify as "running" to subsequent queries
+3. macOS TCC never receives an Apple Events request from the app (no prompt surfaces)
+4. All control attempts fail because the app appears "not running" to AppleScript
+
+**Impact:**
+- **User story broken:** AI cannot stop music when user requests it
+- **Manual workaround required:** User must open Spotify app and press pause manually
+- **MVP feature incomplete:** Music playback can start but not stop programmatically
+- **YouTube Music unaffected:** Works perfectly (embedded web player, no native app issues)
+
+**Current Workaround (Temporary):**
+1. Show notification to user: "אנא לחץ על עצור בספוטיפי" (Please press stop in Spotify)
+2. Or: Attempt to play a silent track to "replace" the current song
+3. Or: Recommend user switch to YouTube Music (fully functional)
+
+**Attempted Solutions (All Failed):**
+- ❌ Multi-line AppleScript with activate
+- ❌ Single-line AppleScript pause
+- ❌ AppleScript quit command
+- ❌ Process.run killall (sandboxing blocks)
+- ❌ Process.run pkill (sandboxing blocks)
+- ❌ Native MethodChannel + NSAppleScript
+- ❌ Entitlements (`com.apple.security.automation.apple-events`)
+- ❌ Info.plist usage description (`NSAppleEventsUsageDescription`)
+- ❌ TCC reset (`tccutil reset AppleEvents`)
+- ❌ Release build testing
+
+**Proposed Solutions:**
+
+**Option A: Spotify Web API (Recommended for MVP)**
+```typescript
+// Use Spotify Web API for playback control
+// Requires OAuth but provides reliable start/stop
+const SpotifyWebApi = require('spotify-web-api-node');
+const api = new SpotifyWebApi({
+  clientId: process.env.SPOTIFY_CLIENT_ID,
+  clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+  redirectUri: 'http://localhost:3000/callback'
+});
+
+// Start playback
+await api.play({ uris: ['spotify:track:5jbxaH9RblHhllVcFOfQtC'] });
+
+// Stop playback
+await api.pause();
+```
+
+**Option B: Spotify Web Player (Embedded)**
+Embed Spotify Web Player in a Flutter WebView for full control without native app issues.
+
+**Option C: YouTube Music Only (Already Working)**
+Recommend users use YouTube Music integration exclusively, avoiding Spotify native app entirely.
+
+**Option D: Defer to Post-MVP**
+Ship MVP with YouTube Music only, revisit Spotify after launch with proper investigation into:
+- Code-signing certificates (Developer ID vs. ad-hoc)
+- Manual TCC approval via `sudo tccutil`
+- Alternative launch methods (activate app first, then play)
+
+**Status:** 🔴 **DEFERRED TO POST-MVP** - Blocked on macOS TCC/Automation complexity  
+**GitHub Issue:** TBD  
+**Estimated Fix Time:** 
+- Option A (Web API): 8-12 hours (OAuth setup + integration + testing)
+- Option B (Web Player): 12-16 hours (WebView + JS bridge + testing)
+- Option C (YouTube only): 0 hours (already working)
+- Option D (Investigate): Unknown (requires macOS platform expertise)
+
+**Decision:**
+Team consensus: **Ship MVP with YouTube Music only**, defer Spotify to Post-MVP Phase. Unblock other P0 tasks (medication reminders, crisis detection, memory continuity).
+
+**Detailed Technical Investigation:**
+See `/SPOTIFY_STOP_PROBLEM_SUMMARY.md` for complete timeline of all attempts, code samples, logs, and architectural analysis.
+
+---
 
 ---
 
 ## 🟡 Medium Priority Issues
 
-### Issue #1: Crisis Detection Uses Keyword Matching Only (Not Semantic)
+### Issue #2: Crisis Detection Uses Keyword Matching Only (Not Semantic)
 **Discovered:** November 11, 2025 during onboarding review  
 **Severity:** Medium-High (Safety feature limitation)  
 **Component:** Safety System (Crisis Detection)
@@ -191,7 +281,7 @@ testCrisis("כואב לי הראש"); // Physical pain
 
 ---
 
-### Issue #2: No Memory Update Mechanism
+### Issue #3: No Memory Update Mechanism
 **Discovered:** November 11, 2025 during Test Scenario 1  
 **Severity:** Medium (UX limitation, not blocker)  
 **Component:** Memory System (Long-term memory)
@@ -270,7 +360,7 @@ Implement `update_important_memory()` and `delete_memory()` functions:
 
 ## 🟢 Low Priority Issues / Cosmetic
 
-### Issue #3: Audio Transcript Delta Warnings
+### Issue #4: Audio Transcript Delta Warnings
 **Discovered:** November 11, 2025 during Test Scenario 1  
 **Severity:** Low (cosmetic, no impact)  
 **Component:** Realtime API WebSocket Events

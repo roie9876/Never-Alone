@@ -14,15 +14,15 @@ export default function Step7Review() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Review & Confirm</h2>
+        <h2 className="text-2xl font-bold text-gray-900">סקירה ואישור</h2>
         <p className="mt-2 text-gray-600">
-          Please review all information before submitting. You can edit any section by clicking the step above.
+          אנא סקור את כל המידע לפני השליחה. ניתן לערוך כל קטע על ידי לחיצה על השלב למעלה.
         </p>
       </div>
 
       {/* Emergency Contacts */}
       <div className="border border-gray-300 rounded-lg p-4">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Emergency Contacts</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">אנשי קשר לחירום</h3>
         <div className="space-y-2">
           {formData.emergencyContacts?.map((contact, index) => (
             <div key={index} className="bg-gray-50 p-3 rounded">
@@ -36,14 +36,14 @@ export default function Step7Review() {
 
       {/* Medications */}
       <div className="border border-gray-300 rounded-lg p-4">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Medications</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">תרופות</h3>
         <div className="space-y-2">
           {formData.medications?.map((med, index) => (
             <div key={index} className="bg-gray-50 p-3 rounded">
               <p className="font-medium">{med.name} - {med.dosage}</p>
-              <p className="text-sm text-gray-600">Time: {med.time}</p>
+              <p className="text-sm text-gray-600">זמן: {med.time}</p>
               {med.specialInstructions && (
-                <p className="text-sm text-gray-600">Instructions: {med.specialInstructions}</p>
+                <p className="text-sm text-gray-600">הוראות: {med.specialInstructions}</p>
               )}
             </div>
           ))}
@@ -52,26 +52,26 @@ export default function Step7Review() {
 
       {/* Daily Routines */}
       <div className="border border-gray-300 rounded-lg p-4">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Daily Routines</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">שגרת יום</h3>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <p className="text-sm text-gray-600">Wake Time</p>
+            <p className="text-sm text-gray-600">זמן השכמה</p>
             <p className="font-medium">{formData.routines?.wakeTime}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Breakfast</p>
+            <p className="text-sm text-gray-600">ארוחת בוקר</p>
             <p className="font-medium">{formData.routines?.breakfastTime}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Lunch</p>
+            <p className="text-sm text-gray-600">ארוחת צהריים</p>
             <p className="font-medium">{formData.routines?.lunchTime}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Dinner</p>
+            <p className="text-sm text-gray-600">ארוחת ערב</p>
             <p className="font-medium">{formData.routines?.dinnerTime}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Sleep Time</p>
+            <p className="text-sm text-gray-600">זמן שינה</p>
             <p className="font-medium">{formData.routines?.sleepTime}</p>
           </div>
         </div>
@@ -79,7 +79,7 @@ export default function Step7Review() {
 
       {/* Conversation Boundaries */}
       <div className="border border-gray-300 rounded-lg p-4">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Conversation Boundaries</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">גבולות שיחה</h3>
         {formData.boundaries?.forbiddenTopics && formData.boundaries.forbiddenTopics.length > 0 ? (
           <div className="space-y-1">
             {formData.boundaries.forbiddenTopics.map((topic, index) => (
@@ -89,18 +89,18 @@ export default function Step7Review() {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-gray-500">No forbidden topics specified</p>
+          <p className="text-sm text-gray-500">לא צוינו נושאים אסורים</p>
         )}
         {formData.boundaries?.notes && (
           <div className="mt-3">
-            <p className="text-sm text-gray-600">Notes: {formData.boundaries.notes}</p>
+            <p className="text-sm text-gray-600">הערות: {formData.boundaries.notes}</p>
           </div>
         )}
       </div>
 
       {/* Crisis Triggers */}
       <div className="border border-gray-300 rounded-lg p-4">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Crisis Triggers</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">טריגרים למצב משבר</h3>
         <div className="space-y-2">
           {formData.crisisTriggers?.map((trigger, index) => (
             <div key={index} className="bg-gray-50 p-3 rounded">
@@ -111,7 +111,7 @@ export default function Step7Review() {
                   trigger.severity === 'high' ? 'bg-orange-100 text-orange-800' :
                   'bg-yellow-100 text-yellow-800'
                 }`}>
-                  {trigger.severity}
+                  {trigger.severity === 'critical' ? 'קריטי' : trigger.severity === 'high' ? 'גבוה' : 'בינוני'}
                 </span>
               </div>
               <p className="text-sm text-gray-600">{trigger.action}</p>
@@ -129,7 +129,7 @@ export default function Step7Review() {
           </div>
           <div className="ml-3">
             <p className="text-sm text-green-700">
-              <strong>Ready to Submit:</strong> This configuration will be saved and used to personalize the AI companion for your loved one.
+              <strong>מוכן לשליחה:</strong> תצורה זו תישמר ותשמש להתאמה אישית של בן הלוויה המלאכותי עבור יקירך.
             </p>
           </div>
         </div>

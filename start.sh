@@ -11,6 +11,27 @@ echo ""
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# Offer optional Flutter rebuild
+read -r -p "🔄 Do you want to perform a Flutter rebuild (flutter clean & flutter pub get)? [y/N] " REBUILD_CHOICE
+if [[ "$REBUILD_CHOICE" =~ ^[Yy]$ ]]; then
+    echo "🛠 Running flutter clean & flutter pub get..."
+    pushd "$SCRIPT_DIR/frontend_flutter" > /dev/null
+    flutter clean
+    flutter pub get
+    popd > /dev/null
+    echo "✅ Flutter rebuild complete"
+else
+    echo "⏩ Skipping Flutter rebuild"
+fi
+
+echo "🏗 Building Flutter macOS release bundle..."
+pushd "$SCRIPT_DIR/frontend_flutter" > /dev/null
+flutter build macos --release
+echo "🔐 Verifying release app entitlements..."
+codesign -d --entitlements :- "build/macos/Build/Products/Release/never_alone_app.app" 2>&1 | tee /tmp/never-alone-entitlements.log
+popd > /dev/null
+echo "✅ Release build ready"
+
 # Kill any existing processes
 echo "🧹 Checking for existing processes..."
 

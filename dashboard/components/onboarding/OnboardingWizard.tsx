@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { v4 as uuidv4 } from 'uuid';
+import { useRouter } from 'next/navigation';
 import { onboardingFormSchema, type OnboardingFormSchema } from '@/lib/validation';
 import { generateYAMLConfig } from '@/lib/yaml-config';
 import { TIFERET_TEST_DATA, EMPTY_FORM_DATA } from '@/lib/test-data';
@@ -22,19 +23,20 @@ import Step9MusicPreferences from './Step9MusicPreferences';
 import Step7Review from './Step7Review';
 
 const steps = [
-  { id: 0, name: 'Patient Background', component: Step0PatientBackground },
-  { id: 1, name: 'Emergency Contacts', component: Step1EmergencyContacts },
-  { id: 2, name: 'Medications', component: Step2Medications },
-  { id: 3, name: 'Daily Routines', component: Step3DailyRoutines },
-  { id: 4, name: 'Conversation Boundaries', component: Step4ConversationBoundaries },
-  { id: 5, name: 'Crisis Triggers', component: Step5CrisisTriggers },
-  { id: 6, name: 'Voice Calibration', component: null }, // Deferred for MVP
-  { id: 7, name: 'Family Photos', component: Step8PhotoUpload }, // Photo Upload
-  { id: 8, name: 'Music Preferences', component: Step9MusicPreferences }, // NEW: Music (optional)
-  { id: 9, name: 'Review & Confirm', component: Step7Review },
+  { id: 0, name: 'רקע המטופל', component: Step0PatientBackground },
+  { id: 1, name: 'אנשי קשר לחירום', component: Step1EmergencyContacts },
+  { id: 2, name: 'תרופות', component: Step2Medications },
+  { id: 3, name: 'שגרת יום', component: Step3DailyRoutines },
+  { id: 4, name: 'גבולות שיחה', component: Step4ConversationBoundaries },
+  { id: 5, name: 'טריגרים למשבר', component: Step5CrisisTriggers },
+  { id: 6, name: 'כיול קול', component: null }, // Deferred for MVP
+  { id: 7, name: 'תמונות משפחה', component: Step8PhotoUpload }, // Photo Upload
+  { id: 8, name: 'העדפות מוזיקה', component: Step9MusicPreferences }, // NEW: Music (optional)
+  { id: 9, name: 'סקירה ואישור', component: Step7Review },
 ];
 
 export default function OnboardingWizard() {
+  const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0); // Start from Step 0 (Patient Background)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -216,6 +218,20 @@ export default function OnboardingWizard() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Back Button */}
+        <div className="mb-4">
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+            type="button"
+          >
+            <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            חזור למסך הראשי
+          </button>
+        </div>
+
         {/* Test Data Toggle */}
         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-center justify-between">
@@ -257,8 +273,8 @@ export default function OnboardingWizard() {
         {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
-            <h1 className="text-3xl font-bold text-gray-900">Safety Configuration</h1>
-            <span className="text-sm text-gray-600">Step {currentStep + 1} of 9</span>
+            <h1 className="text-3xl font-bold text-gray-900">תצורת בטיחות</h1>
+            <span className="text-sm text-gray-600">שלב {currentStep + 1} מתוך 9</span>
           </div>
           <div className="relative">
             <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200">
@@ -286,7 +302,7 @@ export default function OnboardingWizard() {
                 }`}
               >
                 {step.name}
-                {step.id === 6 && ' (Skip)'}
+                {step.id === 6 && ' (דלג)'}
               </button>
             ))}
           </div>
@@ -298,14 +314,14 @@ export default function OnboardingWizard() {
             {currentStep === 6 ? (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Voice Calibration</h2>
+                  <h2 className="text-2xl font-bold text-gray-900">כיול קול</h2>
                   <p className="mt-2 text-gray-600">
-                    This feature will be available in a future update. Click Next to continue.
+                    תכונה זו תהיה זמינה בעדכון עתידי. לחץ הבא כדי להמשיך.
                   </p>
                 </div>
                 <div className="rounded-md bg-blue-50 p-4">
                   <p className="text-sm text-blue-700">
-                    <strong>Coming Soon:</strong> Voice calibration will help the AI recognize the patient&apos;s voice for improved accuracy.
+                    <strong>בקרוב:</strong> כיול הקול יעזור לבינה המלאכותית לזהות את קולו של המטופל לדיוק משופר.
                   </p>
                 </div>
               </div>
@@ -331,10 +347,10 @@ export default function OnboardingWizard() {
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
-                Previous
+                הקודם
               </button>
 
-              {currentStep === 7 ? (
+              {currentStep === 9 ? (
                 <button
                   type="button"
                   disabled={isSubmitting}
@@ -352,12 +368,12 @@ export default function OnboardingWizard() {
                       await methods.handleSubmit(onSubmit)();
                     } else {
                       console.error('❌ Form validation failed:', methods.formState.errors);
-                      alert('Form validation failed. Please check all fields:\n\n' + JSON.stringify(methods.formState.errors, null, 2));
+                      alert('אימות הטופס נכשל. אנא בדוק את כל השדות:\n\n' + JSON.stringify(methods.formState.errors, null, 2));
                     }
                   }}
                   className="px-8 py-3 bg-green-600 text-white rounded-md font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? 'Saving...' : 'Submit & Complete'}
+                  {isSubmitting ? 'שומר...' : 'שלח והשלם'}
                 </button>
               ) : (
                 <button
@@ -365,7 +381,7 @@ export default function OnboardingWizard() {
                   onClick={nextStep}
                   className="px-6 py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700"
                 >
-                  Next
+                  הבא
                 </button>
               )}
             </div>

@@ -10,6 +10,7 @@ export default function Step8PhotoUpload() {
   const photos = watch('photos') || [];
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [tagInputs, setTagInputs] = useState<Record<string, string>>({});
 
   const onDrop = async (acceptedFiles: File[]) => {
     setUploading(true);
@@ -228,13 +229,20 @@ export default function Step8PhotoUpload() {
                     <input
                       type="text"
                       placeholder="לדוגמה: צביה, מיכל, רחלי"
-                      value={photo.manualTags.join(', ')}
+                      value={tagInputs[photo.id] ?? photo.manualTags.join(', ')}
                       onChange={(e) => {
+                        setTagInputs({...tagInputs, [photo.id]: e.target.value});
+                      }}
+                      onBlur={(e) => {
                         const tags = e.target.value
                           .split(',')
                           .map(t => t.trim())
                           .filter(t => t.length > 0);
                         updatePhotoTags(photo.id, tags);
+                        // Clear local state after committing to array
+                        const newInputs = {...tagInputs};
+                        delete newInputs[photo.id];
+                        setTagInputs(newInputs);
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
