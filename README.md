@@ -11,6 +11,8 @@
 
 To bring human warmth, connection, and emotional presence back into everyday life — for those living with dementia, Alzheimer's, aging, or simply loneliness.
 
+![Never Alone App](./main.png)
+
 **Mission:** To use compassionate AI to fight the quiet disease of our time — loneliness.
 
 ---
