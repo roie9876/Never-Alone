@@ -213,10 +213,10 @@ export const EMPTY_FORM_DATA: OnboardingFormSchema = {
   emergencyContacts: [{ name: '', phone: '', relationship: '' }],
   medications: [{ name: '', dosage: '', time: '', specialInstructions: '' }],
   routines: {
-    wakeTime: '07:00',
-    breakfastTime: '08:00',
+    wakeTime: '06:00',
+    breakfastTime: '09:00',
     lunchTime: '12:00',
-    dinnerTime: '18:00',
+    dinnerTime: '19:00',
     sleepTime: '22:00',
   },
   boundaries: {

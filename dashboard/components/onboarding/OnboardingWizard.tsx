@@ -68,12 +68,22 @@ export default function OnboardingWizard() {
         
         // Try to load data for Tiferet (default test user)
         const userId = 'user-tiferet-001';
-        const response = await fetch(`/api/onboarding/${userId}`);
+        
+        // Add timestamp to prevent caching issues
+        const timestamp = new Date().getTime();
+        const response = await fetch(`/api/onboarding/${userId}?t=${timestamp}`, {
+          cache: 'no-store', // Disable Next.js caching
+          headers: {
+            'Cache-Control': 'no-cache', // Disable browser caching
+          },
+        });
         
         if (response.ok) {
           const { data } = await response.json();
           console.log('✅ Loaded existing configuration from Cosmos DB');
-          console.log('   Music preferences:', data.musicPreferences);
+          console.log('   Patient name:', data.patientBackground?.fullName);
+          console.log('   Music enabled:', data.musicPreferences?.enabled);
+          console.log('   Full data:', data);
           
           // Reset form with loaded data
           reset(data);
@@ -116,7 +126,8 @@ export default function OnboardingWizard() {
         fieldsToValidate = ['crisisTriggers'];
         break;
       case 7:
-        fieldsToValidate = ['photos'];
+        // Photos are optional, no validation required
+        fieldsToValidate = [];
         break;
       // Step 8 (Music Preferences) - optional, no validation required
     }
@@ -156,34 +167,6 @@ export default function OnboardingWizard() {
       const yamlConfig = generateYAMLConfig(data);
       console.log('✅ YAML config generated');
 
-      // Transform music preferences (comma-separated strings → arrays)
-      const musicPreferencesPayload = data.musicPreferences?.enabled ? {
-        enabled: true,
-        preferredArtists: data.musicPreferences.preferredArtists
-          ?.split(',')
-          .map(a => a.trim())
-          .filter(a => a.length > 0) || [],
-        preferredSongs: data.musicPreferences.preferredSongs
-          ?.split(',')
-          .map(s => s.trim())
-          .filter(s => s.length > 0) || [],
-        preferredGenres: data.musicPreferences.preferredGenres
-          ?.split(',')
-          .map(g => g.trim())
-          .filter(g => g.length > 0) || [],
-        allowAutoPlay: data.musicPreferences.allowAutoPlay,
-        playOnSadness: data.musicPreferences.playOnSadness,
-        maxSongsPerSession: data.musicPreferences.maxSongsPerSession,
-      } : {
-        enabled: false,
-        preferredArtists: [],
-        preferredSongs: [],
-        preferredGenres: [],
-        allowAutoPlay: false,
-        playOnSadness: false,
-        maxSongsPerSession: 3,
-      };
-
       // Prepare payload for API
       const payload = {
         id: uuidv4(),
@@ -195,18 +178,28 @@ export default function OnboardingWizard() {
         boundaries: data.boundaries,
         crisisTriggers: data.crisisTriggers,
         photos: data.photos || [], // Include photos (optional)
-        musicPreferences: musicPreferencesPayload, // Include music preferences
+        musicPreferences: data.musicPreferences, // Include music preferences (already in form format)
         yamlConfig,
-        createdAt: data.createdAt,
+        createdAt: data.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
       console.log('📤 Sending to API...');
       
+      // Detect if updating existing config (has createdAt from loaded data) or creating new
+      const isUpdate = !useTestData && data.createdAt;
+      const apiUrl = isUpdate ? `/api/onboarding/${data.userId}` : '/api/onboarding';
+      const method = isUpdate ? 'PUT' : 'POST';
+      
+      console.log(`🔄 ${method} ${apiUrl} (${isUpdate ? 'updating existing' : 'creating new'})`);
+      
       // Submit to API route
-      const response = await fetch('/api/onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch(apiUrl, {
+        method,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+        },
         body: JSON.stringify(payload),
       });
 
@@ -402,7 +395,13 @@ export default function OnboardingWizard() {
                   onClick={async () => {
                     console.log('🖱️ Submit button clicked!');
                     console.log('Form errors:', methods.formState.errors);
-                    console.log('Form values:', methods.getValues());
+                    const formValues = methods.getValues();
+                    console.log('Form values:', formValues);
+                    console.log('📸 Photos data:', formValues.photos);
+                    console.log('📸 Photos length:', formValues.photos?.length);
+                    if (formValues.photos && formValues.photos.length > 0) {
+                      console.log('📸 First photo sample:', formValues.photos[0]);
+                    }
                     
                     // Manually trigger validation and submission
                     const isValid = await methods.trigger();
@@ -413,6 +412,7 @@ export default function OnboardingWizard() {
                       await methods.handleSubmit(onSubmit)();
                     } else {
                       console.error('❌ Form validation failed:', methods.formState.errors);
+                      console.error('📸 Photos errors:', methods.formState.errors.photos);
                       alert('אימות הטופס נכשל. אנא בדוק את כל השדות:\n\n' + JSON.stringify(methods.formState.errors, null, 2));
                     }
                   }}

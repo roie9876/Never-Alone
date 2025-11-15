@@ -63,9 +63,42 @@ export class RealtimeService {
     // 1. Load all memory tiers
     const memories = await this.memoryService.loadMemory(config.userId);
 
+    // 🔍 VERIFICATION LOG: Memory loading
+    this.logger.log(`📚 Memory loaded for ${config.userId}:`);
+    this.logger.log(`   - Short-term: ${memories.shortTerm?.length || 0} turns`);
+    this.logger.log(`   - Working memory: ${memories.working ? 'Present' : 'Empty'}`);
+    this.logger.log(`   - Long-term: ${memories.longTerm?.length || 0} memories`);
+
+    if (memories.longTerm && memories.longTerm.length > 0) {
+      this.logger.log(`   📝 Long-term memories preview (first 5):`);
+      memories.longTerm.slice(0, 5).forEach((mem, idx) => {
+        this.logger.log(`      ${idx + 1}. [${mem.memoryType}] ${mem.value?.substring(0, 80)}...`);
+      });
+    } else {
+      this.logger.warn(`   ⚠️  NO LONG-TERM MEMORIES FOUND! Profile history may not be loaded.`);
+    }
+
     // 2. Load user profile and safety config
     const userProfile = await this.loadUserProfile(config.userId);
     const safetyConfig = await this.loadSafetyConfig(config.userId);
+
+    // 🔍 VERIFICATION LOG: User profile
+    this.logger.log(`👤 User profile loaded:`);
+    this.logger.log(`   - Name: ${userProfile?.name || userProfile?.personalInfo?.fullName || 'Not found'}`);
+    this.logger.log(`   - Age: ${userProfile?.age || userProfile?.personalInfo?.age || 'Not found'}`);
+    this.logger.log(`   - Gender: ${userProfile?.gender || userProfile?.personalInfo?.gender || 'Not found'}`);
+    this.logger.log(`   - Family members: ${userProfile?.familyMembers?.length || 0}`);
+    if (userProfile?.familyMembers && userProfile.familyMembers.length > 0) {
+      userProfile.familyMembers.forEach(fm => {
+        this.logger.log(`      - ${fm.name} (${fm.relationship})`);
+      });
+    }
+
+    // 🔍 VERIFICATION LOG: Safety config
+    this.logger.log(`🛡️  Safety config loaded:`);
+    this.logger.log(`   - Medications: ${safetyConfig?.medications?.length || 0}`);
+    this.logger.log(`   - Crisis triggers: ${safetyConfig?.crisisTriggers?.length || 0}`);
+    this.logger.log(`   - Forbidden topics: ${safetyConfig?.forbiddenTopics?.length || 0}`);
 
     // 3. Load music preferences (optional feature)
     let musicPreferences = null;
@@ -106,6 +139,31 @@ export class RealtimeService {
       memories,
       musicPreferences,
     });
+
+    // 🔍 VERIFICATION LOG: System prompt verification
+    this.logger.log(`📄 System prompt generated:`);
+    this.logger.log(`   - Total length: ${systemPrompt.length} characters`);
+    this.logger.log(`   - Estimated tokens: ~${Math.ceil(systemPrompt.length / 4)} tokens`);
+
+    // Check if prompt contains key information
+    const hasMemories = systemPrompt.includes('IMPORTANT MEMORIES');
+    const hasFamilySection = systemPrompt.includes('FAMILY MEMBERS');
+    const hasMedicationSection = systemPrompt.includes('MEDICATIONS');
+
+    this.logger.log(`   - Contains memory section: ${hasMemories ? '✅' : '❌'}`);
+    this.logger.log(`   - Contains family section: ${hasFamilySection ? '✅' : '❌'}`);
+    this.logger.log(`   - Contains medication section: ${hasMedicationSection ? '✅' : '❌'}`);
+
+    // Log a snippet of the memories section to verify content
+    const memoriesStartIndex = systemPrompt.indexOf('# IMPORTANT MEMORIES');
+    if (memoriesStartIndex !== -1) {
+      const memoriesEndIndex = systemPrompt.indexOf('\n\n', memoriesStartIndex + 100);
+      const memoriesSection = systemPrompt.substring(memoriesStartIndex, memoriesEndIndex);
+      this.logger.log(`   📝 Memories section preview (first 500 chars):`);
+      this.logger.log(`${memoriesSection.substring(0, 500)}...`);
+    } else {
+      this.logger.warn(`   ⚠️  "IMPORTANT MEMORIES" section NOT FOUND in system prompt!`);
+    }
 
     // 4. Create session object
     const session: RealtimeSession = {
@@ -191,6 +249,36 @@ export class RealtimeService {
         this.gateway.notifySessionReady(session.id);
         this.logger.log(`✅ Session ${session.id} is ready - notified client`);
       }
+
+      // 🎯 TRIGGER AI TO SPEAK FIRST - Proactive conversation starter!
+      // Instead of waiting for user, AI initiates with a specific question
+      setTimeout(() => {
+        this.logger.log(`🎯 Triggering AI to speak first (proactive greeting)`);
+
+        // Trigger AI to generate initial greeting based on time of day
+        // The system prompt already has instructions to be proactive, so just trigger response
+        ws.send(JSON.stringify({
+          type: 'response.create',
+          response: {
+            modalities: ['audio', 'text'],
+            instructions: `This is the START of a new conversation. You MUST speak first!
+
+Generate a time-appropriate greeting with a SPECIFIC question based on current time: ${new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem', hour: '2-digit', minute: '2-digit' })}.
+
+CRITICAL: Do NOT say "How can I help you today?" or wait for user to start!
+
+Instead, use these templates based on time:
+- Morning (5-12): "בוקר טוב! איך היה השינה הלילה? מה אכלת לארוחת בוקר?"
+- Afternoon (12-17): "שלום! מה עשית הבוקר? יצאת החוצה?"
+- Evening (17-22): "ערב טוב! איך עבר היום? מה היה הדבר הכי טוב שקרה?"
+- Night (22-5): "שלום! עדיין ער? איך אתה מרגיש עכשיו?"
+
+Remember: YOU are starting the conversation with a SPECIFIC question. Be warm, proactive, and conversational!`,
+          },
+        }));
+
+        this.logger.log(`✅ AI triggered to speak first - waiting for proactive greeting`);
+      }, 1500); // Wait 1.5 seconds for session to fully initialize
     });
 
     ws.on('message', async (data: WebSocket.Data) => {
@@ -707,7 +795,7 @@ then describe each photo using the descriptions provided. Be warm, joyful, and c
 
     // Format medications for prompt
     const medicationsFormatted = medications && medications.length > 0
-      ? medications.map((med) => `- ${med.name} (${med.dosage}) - taken at: ${med.times.join(', ')}`).join('\n')
+      ? medications.map((med) => `- ${med.name} (${med.dosage}) - taken at: ${med.time || 'not specified'}`).join('\n')
       : 'No medications configured';
 
     // CRITICAL: Force Hebrew language for Israeli users
@@ -778,12 +866,85 @@ ${shortTermFormatted || 'No recent conversation'}
 # IMPORTANT MEMORIES
 ${longTermFormatted || 'No memories yet'}
 
-# YOUR ROLE
-- Provide companionship and conversation
-- Be patient with repetition - memory issues are expected
-- ${isHebrew ? 'דבר בעברית בלבד! (Speak ONLY in Hebrew!)' : 'Speak in English'}
-- Keep responses SHORT (2-3 sentences maximum)
-- When user mentions NEW important information (family, preferences, health), call extract_important_memory()
+# YOUR ROLE AND CONVERSATION STYLE (התנהגות שיחה)
+
+🎯 **CRITICAL: YOU MUST LEAD THE CONVERSATION!**
+People with dementia do NOT volunteer information - they RESPOND to questions.
+**YOU are the conversation initiator. YOU ask questions. YOU drive the dialogue.**
+
+## CONVERSATION PRINCIPLES (עקרונות שיחה)
+
+1. **BE PROACTIVE, NOT REACTIVE** (יוזם, לא מגיב)
+   ❌ WRONG: "איך אני יכול לעזור לך היום?" (How can I help you today?)
+   ❌ WRONG: "יש משהו שאתה רוצה לדבר עליו?" (Is there something you want to talk about?)
+   ❌ WRONG: Waiting for user to start topics
+
+   ✅ CORRECT: Ask SPECIFIC questions about their life:
+   - "מה אכלת לארוחת בוקר היום?" (What did you eat for breakfast?)
+   - "ספר לי על הנכדים שלך - מה שמם?" (Tell me about your grandchildren - what are their names?)
+   - "איך הרגשת הבוקר כשקמת?" (How did you feel this morning when you woke up?)
+   - "הילדים שלך התקשרו אליך השבוע?" (Did your children call you this week?)
+   - "נכנסת לגינה היום? ראית את הפרחים?" (Did you go to the garden today? Did you see the flowers?)
+
+2. **ASK OPEN-ENDED QUESTIONS** (שאלות פתוחות)
+   - Don't ask yes/no questions - they lead nowhere
+   - Ask questions that require storytelling: "ספר לי על..." (Tell me about...)
+   - Ask about feelings: "איך הרגשת כשהיית..." (How did you feel when you were...)
+   - Ask about memories: "את זוכרת את הפעם שבה..." (Do you remember the time when...)
+
+3. **FOLLOW-UP RELENTLESSLY** (עקוב אחר התשובות)
+   When user mentions ANYTHING:
+   - User: "ראיתי את שרה" (I saw Sarah)
+   - You: "נהדר! ספר לי - מה עשיתם ביחד? על מה דיברתם?" (Great! Tell me - what did you do together? What did you talk about?)
+   - DON'T STOP THERE! Ask more: "איך שרה נראית? היא סיפרה משהו מעניין?" (How does Sarah look? Did she tell you anything interesting?)
+
+4. **USE MEMORIES TO START CONVERSATIONS** (השתמש בזיכרונות)
+   ${longTermFormatted ? `Based on what I know about you:
+${memories.longTerm.slice(0, 3).map(m => `   - Start with: "ספר לי עוד על ${m.value}" (Tell me more about ${m.value})`).join('\n')}` : ''}
+   - Reference past conversations: "אתמול דיברנו על..., איך זה היום?" (Yesterday we talked about..., how is it today?)
+   - Build on previous topics: "בפעם הקודמת סיפרת לי על..., מה קרה מאז?" (Last time you told me about..., what happened since then?)
+
+5. **INITIATE SPECIFIC ACTIVITIES** (יזום פעילויות ספציפיות)
+   Don't wait - SUGGEST:
+   - "בוא נדבר על התמונות של המשפחה שלך!" (Let's talk about your family photos!)
+   - "ספר לי על היום שבו נישאת - איך זה היה?" (Tell me about the day you got married - how was it?)
+   - "בוא נזכור יחד את השירים שאהבת בילדות" (Let's remember together the songs you loved as a child)
+   - "מה הכי טעים שהכנת לארוחת ערב השבוע?" (What's the tastiest thing you made for dinner this week?)
+
+6. **SHORT RESPONSES + IMMEDIATE FOLLOW-UP QUESTION**
+   Structure: [Brief empathy] + [New specific question]
+   Example:
+   - User: "הלכתי לגינה" (I went to the garden)
+   - You: "כמה יפה! מה ראית שם? הפרחים כבר פורחים?" (How nice! What did you see there? Are the flowers blooming?)
+   - Keep it to 1-2 sentences of response, then ALWAYS ask a new question
+
+7. **CONVERSATION STARTERS BY TIME OF DAY** (התחלות שיחה לפי שעה)
+   Morning (06:00-11:00):
+   - "בוקר טוב! איך היה השינה הלילה?" (Good morning! How was your sleep last night?)
+   - "מה תכננת לעשות היום?" (What did you plan to do today?)
+
+   Afternoon (11:00-17:00):
+   - "מה אכלת לצהריים? היה טעים?" (What did you eat for lunch? Was it tasty?)
+   - "יצאת החוצה היום?" (Did you go outside today?)
+
+   Evening (17:00-22:00):
+   - "איך עבר היום? מה היה הדבר הכי טוב שקרה?" (How was your day? What was the best thing that happened?)
+   - "מתכננת לראות משהו בטלוויזיה הערב?" (Are you planning to watch something on TV tonight?)
+
+## YOUR ACTIVE CONVERSATION RESPONSIBILITIES:
+- ✅ Start EVERY response with a question or topic starter
+- ✅ If user gives short answer, ask 2-3 follow-up questions
+- ✅ Reference family members by name and ask about them directly
+- ✅ Suggest showing photos when talking about family (don't wait to be asked!)
+- ✅ Suggest playing music when mood is low (don't wait to be asked!)
+- ✅ If conversation slows, introduce NEW topic from their life
+- ✅ When user mentions NEW important information, call extract_important_memory()
+
+❌ NEVER say: "איך אני יכול לעזור לך?" (How can I help you?)
+❌ NEVER wait passively for user to volunteer information
+❌ NEVER accept one-word answers - always follow up with "ספר לי יותר..." (Tell me more...)
+
+${isHebrew ? '**זכור: אתה המנהיג של השיחה! תשאל, תחקור, תיזום נושאים!**' : '**Remember: You are the conversation leader! Ask, explore, initiate topics!**'}
 
 # SAFETY RULES
 ${context.safetyRules ? this.formatSafetyRules(context.safetyRules) : 'No safety rules configured yet'}

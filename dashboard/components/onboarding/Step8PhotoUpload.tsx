@@ -173,8 +173,8 @@ export default function Step8PhotoUpload() {
       {/* Upload Progress */}
       {Object.keys(uploadProgress).length > 0 && (
         <div className="space-y-2">
-          {Object.entries(uploadProgress).map(([fileName, progress]) => (
-            <div key={fileName} className="bg-gray-50 rounded-lg p-3">
+          {Object.entries(uploadProgress).map(([fileName, progress], index) => (
+            <div key={fileName || `upload-${index}`} className="bg-gray-50 rounded-lg p-3">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-sm font-medium text-gray-700">{fileName}</span>
                 <span className="text-sm text-gray-500">{progress}%</span>
@@ -197,9 +197,9 @@ export default function Step8PhotoUpload() {
             תמונות שהועלו ({photos.length})
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {photos.map((photo) => (
+            {photos.map((photo, index) => (
               <div
-                key={photo.id}
+                key={photo.id || `photo-${index}`}
                 className="border border-gray-200 rounded-lg p-4 space-y-3"
               >
                 {/* Photo Preview */}

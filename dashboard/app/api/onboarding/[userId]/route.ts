@@ -1,6 +1,9 @@
 /**
  * API Route: GET /api/onboarding/[userId]
  * Load existing safety configuration from Cosmos DB
+ * 
+ * API Route: PUT /api/onboarding/[userId]
+ * Update existing safety configuration in Cosmos DB
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -9,9 +12,10 @@ import { DefaultAzureCredential } from '@azure/identity';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
-  const { userId } = params;
+  // Next.js 15+: params is now a Promise that must be awaited
+  const { userId } = await params;
   
   console.log(`🔍 GET /api/onboarding/${userId} - Loading existing configuration`);
   
@@ -108,9 +112,13 @@ export async function GET(
       boundaries: safetyConfig.boundaries || safetyConfig.neverAllow || [],
       crisisTriggers: safetyConfig.crisisTriggers || [],
       photos: photos.map(p => ({
+        id: p.id || `photo-${Date.now()}-${Math.random()}`,
+        fileName: p.fileName || p.blobUrl.split('/').pop() || 'unknown',
         blobUrl: p.blobUrl,
+        uploadedAt: p.uploadedAt || p._ts ? new Date(p._ts * 1000).toISOString() : new Date().toISOString(),
         manualTags: p.manualTags || [],
         caption: p.caption || '',
+        size: p.size || 0,
       })),
       musicPreferences: musicPreferences ? {
         enabled: musicPreferences.enabled,
@@ -135,10 +143,20 @@ export async function GET(
     
     console.log(`✅ Configuration loaded successfully for user ${userId}`);
     
-    return NextResponse.json({
-      success: true,
-      data: formData,
-    });
+    // Return with no-cache headers to prevent stale data on refresh
+    return NextResponse.json(
+      {
+        success: true,
+        data: formData,
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      }
+    );
     
   } catch (error) {
     console.error(`❌ Error loading configuration: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -149,6 +167,127 @@ export async function GET(
     return NextResponse.json(
       { 
         error: 'Failed to load configuration',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PUT /api/onboarding/[userId]
+ * Update existing configuration (upsert)
+ */
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ userId: string }> }
+) {
+  const { userId } = await params;
+  
+  console.log(`🔄 PUT /api/onboarding/${userId} - Updating configuration`);
+  
+  try {
+    const body = await request.json();
+    console.log('📝 Update data received');
+    
+    // Initialize Cosmos client
+    const credential = new DefaultAzureCredential();
+    const client = new CosmosClient({
+      endpoint: process.env.COSMOS_ENDPOINT!,
+      aadCredentials: credential,
+    });
+    
+    const database = client.database('never-alone');
+    
+    // Update safety config
+    const safetyContainer = database.container('safety-config');
+    
+    // First, find the existing document
+    const { resources: existingConfigs } = await safetyContainer.items
+      .query({
+        query: 'SELECT * FROM c WHERE c.userId = @userId',
+        parameters: [{ name: '@userId', value: userId }],
+      })
+      .fetchAll();
+    
+    // Prepare updated config
+    const updatedConfig = {
+      id: existingConfigs.length > 0 ? existingConfigs[0].id : `config-${userId}-${Date.now()}`,
+      userId: userId,
+      patientBackground: body.patientBackground,
+      emergencyContacts: body.emergencyContacts,
+      medications: body.medications,
+      routines: body.routines,
+      boundaries: body.boundaries,
+      crisisTriggers: body.crisisTriggers,
+      yamlConfig: body.yamlConfig,
+      createdAt: existingConfigs.length > 0 ? existingConfigs[0].createdAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    // Upsert (update or insert)
+    const { resource: savedConfig } = await safetyContainer.items.upsert(updatedConfig);
+    console.log('✅ Safety config updated');
+    
+    // Update music preferences if provided
+    if (body.musicPreferences) {
+      console.log('🎵 Updating music preferences...');
+      const musicContainer = database.container('user-music-preferences');
+      
+      // Find existing music prefs
+      const { resources: existingMusic } = await musicContainer.items
+        .query({
+          query: 'SELECT * FROM c WHERE c.userId = @userId',
+          parameters: [{ name: '@userId', value: userId }],
+        })
+        .fetchAll();
+      
+      const musicPrefs = {
+        id: existingMusic.length > 0 ? existingMusic[0].id : `music-${userId}-${Date.now()}`,
+        userId: userId,
+        enabled: body.musicPreferences.enabled,
+        preferredArtists: body.musicPreferences.preferredArtists ? 
+          body.musicPreferences.preferredArtists.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+        preferredSongs: body.musicPreferences.preferredSongs ?
+          body.musicPreferences.preferredSongs.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+        preferredGenres: body.musicPreferences.preferredGenres ?
+          body.musicPreferences.preferredGenres.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+        allowAutoPlay: body.musicPreferences.allowAutoPlay || false,
+        playOnSadness: body.musicPreferences.playOnSadness || false,
+        maxSongsPerSession: body.musicPreferences.maxSongsPerSession || 3,
+        updatedAt: new Date().toISOString(),
+      };
+      
+      await musicContainer.items.upsert(musicPrefs);
+      console.log('✅ Music preferences updated');
+    }
+    
+    console.log(`✅ Configuration updated successfully for user ${userId}`);
+    
+    return NextResponse.json(
+      {
+        success: true,
+        data: savedConfig,
+        message: 'Configuration updated successfully',
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      }
+    );
+    
+  } catch (error) {
+    console.error(`❌ Error updating configuration: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (error instanceof Error) {
+      console.error(error.stack);
+    }
+    
+    return NextResponse.json(
+      { 
+        error: 'Failed to update configuration',
         message: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }

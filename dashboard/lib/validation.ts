@@ -7,7 +7,34 @@ import { z } from 'zod';
 // Emergency Contact Schema
 export const emergencyContactSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  phone: z.string().regex(/^\+972-\d{2}-\d{3}-\d{4}$/, 'מספר טלפון חייב להיות בפורמט: +972-50-123-4567'),
+  phone: z.string()
+    .min(10, 'מספר טלפון חייב להכיל לפחות 10 ספרות')
+    .transform((val) => {
+      // Remove all non-digit characters except +
+      const cleaned = val.replace(/[^\d+]/g, '');
+      
+      // If starts with +972, format as +972-XX-XXX-XXXX
+      if (cleaned.startsWith('+972') && cleaned.length >= 13) {
+        const areaCode = cleaned.substring(4, 6);
+        const firstPart = cleaned.substring(6, 9);
+        const secondPart = cleaned.substring(9, 13);
+        return `+972-${areaCode}-${firstPart}-${secondPart}`;
+      }
+      
+      // If starts with 0, convert to +972 format
+      if (cleaned.startsWith('0') && cleaned.length >= 10) {
+        const areaCode = cleaned.substring(1, 3);
+        const firstPart = cleaned.substring(3, 6);
+        const secondPart = cleaned.substring(6, 10);
+        return `+972-${areaCode}-${firstPart}-${secondPart}`;
+      }
+      
+      return val; // Return as-is if format not recognized
+    })
+    .refine(
+      (val) => /^\+972-\d{2}-\d{3}-\d{4}$/.test(val),
+      { message: 'מספר טלפון חייב להיות בפורמט: +972-50-123-4567' }
+    ),
   relationship: z.string().min(2, 'Relationship must be specified'),
 });
 
@@ -54,13 +81,13 @@ export const crisisTriggerSchema = z.object({
 
 // Photo Schema (Optional - for family photos)
 export const photoSchema = z.object({
-  id: z.string(),
-  fileName: z.string(),
-  blobUrl: z.string().min(1, 'Photo URL is required'), // Accept both full URLs and relative paths
-  uploadedAt: z.string().min(1, 'Upload timestamp is required'), // Accept any ISO string format
-  manualTags: z.array(z.string()),
-  caption: z.string().optional(),
-  size: z.number().positive('File size must be positive'),
+  id: z.string().optional().default(''), // Optional - will be generated if missing
+  fileName: z.string().optional().default(''), // Optional - can be extracted from blobUrl
+  blobUrl: z.string().min(1, 'Photo URL is required'), // Only required field - the photo URL itself
+  uploadedAt: z.string().optional().default(''), // Optional - can use current timestamp if missing
+  manualTags: z.array(z.string()).optional().default([]), // Optional - empty array if not provided
+  caption: z.string().optional().default(''), // Optional caption
+  size: z.number().nonnegative().optional().default(0), // Optional, default to 0 if not provided
 });
 
 // Music Preferences Schema (Optional - therapeutic music playback)
@@ -104,7 +131,7 @@ export const onboardingFormSchema = z.object({
   voiceCalibration: z.object({
     enabled: z.boolean(),
   }).optional(),
-  photos: z.array(photoSchema).max(20, 'Maximum 20 photos allowed').optional().default([]), // NEW: Family photos (optional)
+  photos: z.array(photoSchema).max(50, 'Maximum 50 photos allowed').optional(), // NEW: Family photos (optional, no default)
   musicPreferences: musicPreferencesSchema.optional(), // NEW: Music preferences (optional)
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
