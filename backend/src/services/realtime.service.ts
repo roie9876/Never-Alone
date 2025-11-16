@@ -105,10 +105,17 @@ export class RealtimeService {
     try {
       musicPreferences = await this.musicService.loadMusicPreferences(config.userId);
       if (musicPreferences) {
-        this.logger.debug(`Music preferences loaded for user ${config.userId}`);
+        this.logger.log(`🎵 Music preferences loaded for user ${config.userId}:`);
+        this.logger.log(`   - Enabled: ${musicPreferences.enabled}`);
+        this.logger.log(`   - Artists: ${musicPreferences.preferredArtists?.length || 0} configured`);
+        this.logger.log(`   - Songs: ${musicPreferences.preferredSongs?.length || 0} configured`);
+        this.logger.log(`   - Allow auto-play: ${musicPreferences.allowAutoPlay}`);
+        this.logger.log(`   - Play on sadness: ${musicPreferences.playOnSadness}`);
+      } else {
+        this.logger.log(`⚠️  No music preferences found for user ${config.userId} - music features disabled`);
       }
     } catch (error) {
-      this.logger.debug(`No music preferences found for user ${config.userId}`);
+      this.logger.warn(`❌ Error loading music preferences: ${error.message}`);
     }
 
     // 4. Extract user name from profile (handle both old and new schema)
@@ -122,9 +129,14 @@ export class RealtimeService {
                     70;
 
     // 4a. Extract user gender for Hebrew grammar (CRITICAL for proper conjugation)
-    const userGender = userProfile?.gender ||
-                       userProfile?.personalInfo?.gender ||
+    // IMPORTANT: personalInfo.gender takes precedence (new schema)
+    const userGender = userProfile?.personalInfo?.gender ||
+                       userProfile?.gender ||
                        'male'; // Default to male if not specified
+
+    this.logger.log(`🔍 DEBUG: userProfile.gender = ${userProfile?.gender}`);
+    this.logger.log(`🔍 DEBUG: userProfile.personalInfo.gender = ${userProfile?.personalInfo?.gender}`);
+    this.logger.log(`🔍 DEBUG: Final userGender = ${userGender}`);
 
     // 5. Build system prompt with context
     const systemPrompt = this.buildSystemPrompt({
@@ -179,7 +191,7 @@ export class RealtimeService {
     this.activeSessions.set(session.id, session);
 
     // 5. Create WebSocket connection to Azure OpenAI
-    await this.initializeWebSocket(session, systemPrompt, config);
+    await this.initializeWebSocket(session, systemPrompt, config, musicPreferences);
 
     this.logger.log(`Session created: ${session.id}`);
     return session;
@@ -192,6 +204,7 @@ export class RealtimeService {
     session: RealtimeSession,
     systemPrompt: string,
     config: RealtimeSessionConfig,
+    musicPreferences?: any,
   ): Promise<void> {
     const endpoint = this.configService.get<string>('AZURE_OPENAI_ENDPOINT');
     const deployment = this.configService.get<string>('AZURE_OPENAI_DEPLOYMENT');
@@ -231,16 +244,17 @@ export class RealtimeService {
           output_audio_format: 'pcm16',
           input_audio_transcription: {
             model: 'whisper-1',
+            language: 'he', // ✅ Force Hebrew detection (without prompt to maintain flexibility)
           },
           turn_detection: {
             type: 'server_vad',
             threshold: 0.5,
             prefix_padding_ms: 300,
-            silence_duration_ms: 500,
+            silence_duration_ms: 500, // Reverted to working value from Nov 15
           },
-          tools: this.getFunctionTools(),
-          temperature: 0.8,
-          max_response_output_tokens: 4096,
+          tools: this.getFunctionTools(musicPreferences),
+          temperature: 0.8, // Reverted to working value from Nov 15 (min is 0.6)
+          max_response_output_tokens: 4096, // Reverted to working value from Nov 15
         },
       }));
 
@@ -261,19 +275,22 @@ export class RealtimeService {
           type: 'response.create',
           response: {
             modalities: ['audio', 'text'],
-            instructions: `This is the START of a new conversation. You MUST speak first!
+            instructions: `⚠️ זוהי התחלת שיחה חדשה - אתה חייב לדבר ראשון בעברית! ⚠️
 
-Generate a time-appropriate greeting with a SPECIFIC question based on current time: ${new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem', hour: '2-digit', minute: '2-digit' })}.
+השעה הנוכחית: ${new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem', hour: '2-digit', minute: '2-digit' })}.
 
-CRITICAL: Do NOT say "How can I help you today?" or wait for user to start!
+🚨 חשוב ביותר: דבר רק בעברית! 🚨
+❌ אסור לדבר באנגלית!
+❌ אסור לדבר בפרסית!
+✅ רק עברית!
 
-Instead, use these templates based on time:
-- Morning (5-12): "בוקר טוב! איך היה השינה הלילה? מה אכלת לארוחת בוקר?"
-- Afternoon (12-17): "שלום! מה עשית הבוקר? יצאת החוצה?"
-- Evening (17-22): "ערב טוב! איך עבר היום? מה היה הדבר הכי טוב שקרה?"
-- Night (22-5): "שלום! עדיין ער? איך אתה מרגיש עכשיו?"
+בחר ברכה מתאימה לשעה:
+- בוקר (5-12): "בוקר טוב! איך היה השינה הלילה? מה אכלת לארוחת בוקר?"
+- אחר הצהריים (12-17): "שלום! מה עשית הבוקר? יצאת החוצה?"
+- ערב (17-22): "ערב טוב! איך עבר היום? מה היה הדבר הכי טוב שקרה?"
+- לילה (22-5): "שלום! עדיין ער? איך אתה מרגיש עכשיו?"
 
-Remember: YOU are starting the conversation with a SPECIFIC question. Be warm, proactive, and conversational!`,
+זכור: אתה פותח את השיחה בעברית עם שאלה ספציפית. היה חם ויוזם!`,
           },
         }));
 
@@ -316,9 +333,32 @@ Remember: YOU are starting the conversation with a SPECIFIC question. Be warm, p
         break;
 
       case 'conversation.item.input_audio_transcription.completed':
-        // User spoke - transcript ready
-        this.logger.debug(`📝 Input transcription event: item_id=${event.item_id}, transcript="${event.transcript?.substring(0, 30)}..."`);
+        // User spoke - transcript ready (Whisper transcription complete)
+        this.logger.log(`🎤 ✅ ✅ ✅ TRANSCRIPTION COMPLETED! item_id=${event.item_id}, transcript="${event.transcript?.substring(0, 50)}..."`);
+        this.logger.log(`🎤 Full transcription event: ${JSON.stringify(event).substring(0, 500)}`);
         await this.handleUserTranscript(session, event);
+        break;
+
+      case 'conversation.item.input_audio_transcription.failed':
+        // Transcription failed
+        this.logger.error(`❌ ❌ ❌ TRANSCRIPTION FAILED for item ${event.item_id}: ${JSON.stringify(event.error)}`);
+        break;
+
+      case 'input_audio_buffer.committed':
+        // ✅ CRITICAL FIX: Azure is NOT auto-transcribing despite input_audio_transcription config!
+        // Solution: Use a client-side transcription service OR accept that Azure Realtime API
+        // doesn't transcribe user audio in current version/configuration.
+        this.logger.log(`🎤 🎤 🎤 input_audio_buffer.committed event: item_id=${event.item_id}`);
+        this.logger.log(`🎤 Full event: ${JSON.stringify(event).substring(0, 500)}`);
+
+        // WORKAROUND: Since Azure won't transcribe, let's save a placeholder for now
+        // and implement client-side transcription later
+        this.logger.warn(`⚠️ Azure Realtime API does NOT transcribe user audio in current configuration`);
+        this.logger.warn(`⚠️ User audio was received but NO transcript available`);
+        this.logger.warn(`⚠️ Possible solutions:`);
+        this.logger.warn(`   1. Use separate Azure Speech-to-Text API for user audio`);
+        this.logger.warn(`   2. Transcribe client-side before sending`);
+        this.logger.warn(`   3. Wait for Azure to add this feature in future API version`);
         break;
 
       case 'response.audio.delta':
@@ -352,9 +392,15 @@ Remember: YOU are starting the conversation with a SPECIFIC question. Be warm, p
         break;
 
       default:
+        // 🔍 LOG **ALL** EVENTS to find what we're missing!
+        if (event.type && !event.type.includes('audio.delta') && !event.type.includes('audio_transcript.delta')) {
+          this.logger.debug(`🔍 Event: ${event.type} - ${JSON.stringify(event).substring(0, 300)}`);
+        }
+
         // Log unknown transcript events to catch duplicates
         if (event.type?.includes('transcript') || event.type?.includes('transcription')) {
-          this.logger.warn(`⚠️ Unhandled transcript event: ${event.type}, data: ${JSON.stringify(event).substring(0, 200)}`);
+          this.logger.warn(`⚠️ ⚠️ ⚠️ UNHANDLED TRANSCRIPT EVENT: ${event.type}`);
+          this.logger.warn(`Full event data: ${JSON.stringify(event).substring(0, 500)}`);
         }
         // Ignore other events for MVP
         break;
@@ -365,20 +411,29 @@ Remember: YOU are starting the conversation with a SPECIFIC question. Be warm, p
    * Handle user transcript (voice input)
    */
   private async handleUserTranscript(session: RealtimeSession, event: any): Promise<void> {
+    this.logger.log(`🎤 ===== HANDLING USER TRANSCRIPT =====`);
+    this.logger.log(`🎤 Transcript: "${event.transcript}"`);
+    this.logger.log(`🎤 Session: ${session.id}`);
+    this.logger.log(`🎤 User: ${session.userId}`);
+
     const turn: ConversationTurn = {
       role: 'user',
       timestamp: new Date().toISOString(),
       transcript: event.transcript,
     };
 
+    this.logger.log(`🎤 Created turn object: ${JSON.stringify(turn)}`);
+
     // Save to short-term memory
     await this.memoryService.addShortTermTurn(session.userId, turn);
+    this.logger.log(`🎤 ✅ Saved to short-term memory`);
 
     // Save to Cosmos DB (conversations container)
     await this.saveConversationTurn(session, turn);
+    this.logger.log(`🎤 ✅ Saved to Cosmos DB`);
 
     session.turnCount++;
-    this.logger.debug(`User transcript: "${event.transcript.substring(0, 50)}..."`);
+    this.logger.log(`🎤 ===== USER TRANSCRIPT HANDLING COMPLETE =====`);
   }
 
   /**
@@ -728,6 +783,12 @@ then describe each photo using the descriptions provided. Be warm, joyful, and c
    * Save conversation turn to Cosmos DB
    */
   private async saveConversationTurn(session: RealtimeSession, turn: ConversationTurn): Promise<void> {
+    this.logger.log(`💾 ===== SAVING TURN TO COSMOS DB =====`);
+    this.logger.log(`💾 Turn role: ${turn.role}`);
+    this.logger.log(`💾 Turn transcript: "${turn.transcript?.substring(0, 50)}..."`);
+    this.logger.log(`💾 Session: ${session.id}`);
+    this.logger.log(`💾 Conversation: ${session.conversationId}`);
+
     try {
       // Query for existing conversation document
       const query = `
@@ -735,6 +796,8 @@ then describe each photo using the descriptions provided. Be warm, joyful, and c
         WHERE c.conversationId = @conversationId
           AND c.userId = @userId
       `;
+
+      this.logger.log(`💾 Querying for existing conversation...`);
 
       const { resources } = await this.azureConfig.conversationsContainer.items
         .query({
@@ -746,35 +809,53 @@ then describe each photo using the descriptions provided. Be warm, joyful, and c
         })
         .fetchAll();
 
+      this.logger.log(`💾 Found ${resources.length} existing conversations`);
+
       if (resources.length > 0) {
         // Update existing conversation
+        this.logger.log(`💾 Updating existing conversation...`);
         const conversation = resources[0];
+        this.logger.log(`💾 Current turns count: ${conversation.turns?.length || 0}`);
+
         conversation.turns.push(turn);
-        conversation.endTime = new Date().toISOString();
+        conversation.endedAt = new Date().toISOString(); // ✅ FIXED: Changed from endTime to endedAt
         conversation.totalTurns = conversation.turns.length;
+
+        this.logger.log(`💾 New turns count: ${conversation.turns.length}`);
+        this.logger.log(`💾 Last turn role: ${conversation.turns[conversation.turns.length - 1].role}`);
 
         await this.azureConfig.conversationsContainer
           .item(conversation.id, session.userId)
           .replace(conversation);
+
+        this.logger.log(`💾 ✅ Updated conversation successfully`);
       } else {
         // Create new conversation document
+        this.logger.log(`💾 Creating new conversation document...`);
         const conversation = {
           id: uuidv4(),
           userId: session.userId,
           conversationId: session.conversationId,
           sessionId: session.id,
           type: 'conversation',
-          startTime: session.startedAt,
-          endTime: new Date().toISOString(),
+          startedAt: session.startedAt, // ✅ FIXED: Changed from startTime to startedAt (matches dashboard schema)
+          endedAt: new Date().toISOString(), // ✅ FIXED: Changed from endTime to endedAt
           turns: [turn],
           totalTurns: 1,
           tokenUsage: session.tokenUsage,
         };
 
+        this.logger.log(`💾 First turn role: ${turn.role}`);
+        this.logger.log(`💾 First turn transcript: "${turn.transcript?.substring(0, 30)}..."`);
+
         await this.azureConfig.conversationsContainer.items.create(conversation);
+        this.logger.log(`💾 ✅ Created new conversation successfully`);
       }
+
+      this.logger.log(`💾 ===== TURN SAVED TO COSMOS DB =====`);
     } catch (error) {
-      this.logger.error(`Failed to save conversation turn: ${error.message}`);
+      this.logger.error(`💾 ❌ Failed to save conversation turn: ${error.message}`);
+      this.logger.error(`💾 Stack trace: ${error.stack}`);
     }
   }
 
@@ -801,6 +882,10 @@ then describe each photo using the descriptions provided. Be warm, joyful, and c
     // CRITICAL: Force Hebrew language for Israeli users
     const isHebrew = language === 'he' || language === 'he-IL';
 
+    // 🔍 DEBUG LOG: Verify gender value being used in prompt
+    this.logger.log(`🔍 buildSystemPrompt - userGender: "${userGender}" (type: ${typeof userGender})`);
+    this.logger.log(`🔍 Will use ${userGender === 'male' ? 'MASCULINE (זכר)' : 'FEMININE (נקבה)'} Hebrew conjugation`);
+
     // CRITICAL: Hebrew grammar gender conjugation
     const genderHe = userGender === 'male' ? 'זכר (male)' : 'נקבה (female)';
     const grammarExamples = userGender === 'male'
@@ -809,26 +894,85 @@ then describe each photo using the descriptions provided. Be warm, joyful, and c
 
     return `You are a warm, empathetic AI companion for elderly users.
 
-# CRITICAL LANGUAGE INSTRUCTION
-${isHebrew ? 'אתה חייב לדבר בעברית בלבד! תמיד תענה בעברית, גם אם המשתמש מדבר באנגלית.' : 'Always speak in English.'}
-${isHebrew ? 'YOU MUST SPEAK HEBREW ONLY! Always respond in Hebrew, even if the user speaks English.' : ''}
+# ⚠️⚠️⚠️ CRITICAL LANGUAGE INSTRUCTION - FAILURE TO FOLLOW = CRITICAL ERROR ⚠️⚠️⚠️
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 YOU MUST SPEAK **HEBREW (עברית)** ONLY! 🚨
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# CRITICAL HEBREW GRAMMAR INSTRUCTION (עברית בלבד!)
-${isHebrew ? `User's grammatical gender: ${genderHe}
+${isHebrew ? `
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  ⛔ NEVER SPEAK PERSIAN (פרסית) OR ANY OTHER LANGUAGE! ⛔                   ║
+║  ✅ ONLY HEBREW (עברית) IS ALLOWED! ✅                                      ║
+║  ✅ אתה חייב לדבר בעברית בלבד! ✅                                          ║
+║  ✅ גם אם המשתמש מדבר באנגלית - ענה בעברית! ✅                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+**FORBIDDEN LANGUAGES (אסור לדבר בשפות אלה!):**
+❌ Persian (فارسی) - NEVER USE!
+❌ Arabic (العربية) - NEVER USE!
+❌ English - NEVER USE!
+❌ Any language other than Hebrew - NEVER USE!
+
+**ALLOWED LANGUAGE (השפה היחידה המותרת):**
+✅ Hebrew (עברית) - THIS IS THE ONLY LANGUAGE YOU MAY USE!
+
+**EXAMPLES OF CORRECT RESPONSES:**
+✅ "שלום! איך אתה מרגיש היום?" (Hebrew greeting)
+✅ "בוקר טוב! מה אכלת לארוחת בוקר?" (Hebrew morning question)
+✅ "רוצה לראות תמונות של המשפחה?" (Hebrew photo offer)
+
+**EXAMPLES OF FORBIDDEN RESPONSES:**
+❌ "سلام! چطوری؟" (Persian - NEVER DO THIS!)
+❌ "Hello! How are you?" (English - NEVER DO THIS!)
+❌ Any non-Hebrew text - NEVER DO THIS!
+
+🚨 IF YOU RESPOND IN ANY LANGUAGE OTHER THAN HEBREW, YOU ARE MAKING A CRITICAL ERROR! 🚨
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+` : 'Always speak in English.'}
+
+# ⚠️ CRITICAL HEBREW GRAMMAR INSTRUCTION (עברית בלבד!) ⚠️
+${isHebrew ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 MANDATORY GENDER RULE - FAILURE TO FOLLOW = CRITICAL ERROR 🚨
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+User's grammatical gender: ${genderHe}
 ${userGender === 'male' ? `
-**ALWAYS use MASCULINE conjugation when addressing ${userName}:**
-- אתה (you) - NOT את
-- הלכת (you went - masculine) - NOT הלכת (feminine)
-- רוצה (you want - masculine) - NOT רוצה (feminine)
-- שמח (happy - masculine) - NOT שמחה (feminine)
-- מרגיש (feel - masculine) - NOT מרגישה (feminine)
+╔════════════════════════════════════════════════════════════════════╗
+║  ⚠️  ${userName} is MALE - USE ONLY MASCULINE HEBREW FORMS  ⚠️   ║
+╚════════════════════════════════════════════════════════════════════╝
 
-Examples:
-✅ CORRECT: "איך אתה מרגיש היום?" (How are you feeling today? - masculine)
-❌ WRONG: "איך את מרגישה היום?" (feminine form - DO NOT USE!)
+**YOU MUST ALWAYS USE MASCULINE (זכר) CONJUGATION:**
 
-✅ CORRECT: "אתה רוצה לראות תמונות?" (Do you want to see photos? - masculine)
-❌ WRONG: "את רוצה לראות תמונות?" (feminine form - DO NOT USE!)
+┌─ CORRECT FORMS (USE THESE) ────────────────────────────────────┐
+│ • אתה (you - masculine) ← USE THIS                             │
+│ • מרגיש (feel - masculine) ← USE THIS                          │
+│ • רוצה (want - masculine) ← USE THIS                           │
+│ • שמח (happy - masculine) ← USE THIS                           │
+│ • הלכת (went - masculine) ← USE THIS                           │
+└────────────────────────────────────────────────────────────────┘
+
+┌─ FORBIDDEN FORMS (NEVER USE) ──────────────────────────────────┐
+│ ❌ את (you - feminine) ← NEVER USE THIS                        │
+│ ❌ מרגישה (feel - feminine) ← NEVER USE THIS                   │
+│ ❌ רוצה (want - feminine) ← NEVER USE THIS                     │
+│ ❌ שמחה (happy - feminine) ← NEVER USE THIS                    │
+│ ❌ הלכת (went - feminine) ← NEVER USE THIS                     │
+└────────────────────────────────────────────────────────────────┘
+
+**CORRECT EXAMPLES (COPY THESE PATTERNS):**
+✅ "איך אתה מרגיש היום?" (How are you feeling today?)
+✅ "אתה רוצה לראות תמונות?" (Do you want to see photos?)
+✅ "אתה שמח היום?" (Are you happy today?)
+✅ "איפה הלכת הבוקר?" (Where did you go this morning?)
+
+**WRONG EXAMPLES (NEVER SAY THESE):**
+❌ "איך את מרגישה היום?" ← WRONG! This is feminine!
+❌ "את רוצה לראות תמונות?" ← WRONG! This is feminine!
+❌ "את שמחה היום?" ← WRONG! This is feminine!
+
+🔴 IF YOU USE FEMININE FORMS, YOU ARE MAKING A CRITICAL ERROR! 🔴
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ` : `
 **ALWAYS use FEMININE conjugation when addressing ${userName}:**
 - את (you) - NOT אתה
@@ -872,7 +1016,43 @@ ${longTermFormatted || 'No memories yet'}
 People with dementia do NOT volunteer information - they RESPOND to questions.
 **YOU are the conversation initiator. YOU ask questions. YOU drive the dialogue.**
 
+${userGender === 'male' ? `
+⚠️ REMINDER: ${userName} is MALE (זכר) - Use אתה/מרגיש/רוצה (NOT את/מרגישה/רוצה) ⚠️
+` : `
+⚠️ REMINDER: ${userName} is FEMALE (נקבה) - Use את/מרגישה/רוצה (NOT אתה/מרגיש/רוצה) ⚠️
+`}
+
 ## CONVERSATION PRINCIPLES (עקרונות שיחה)
+
+⚠️ **CRITICAL RULE: NEVER FABRICATE OR INVENT INFORMATION** ⚠️
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 DO NOT make up facts, events, or conversations that didn't happen! 🚨
+
+If user didn't mention something → DON'T assume it happened!
+If you don't have information → ASK, don't invent!
+
+**Examples of FORBIDDEN behavior:**
+❌ WRONG: User says "שלום" → You say "איך היה הביקור של שרה אתמול?" (How was Sarah's visit yesterday?)
+   ↑ NEVER assume Sarah visited! User didn't mention it!
+
+❌ WRONG: User says "הלכתי לגינה" → You say "נהדר! ראית את הוורדים האדומים שזרעת?"
+   ↑ NEVER assume red roses exist! User didn't mention them!
+
+❌ WRONG: Inventing conversations: "בפעם הקודמת סיפרת לי ש..." when user never said it
+
+**CORRECT behavior:**
+✅ CORRECT: "מי ביקר אותך לאחרונה?" (Who visited you recently?) ← ASK first!
+✅ CORRECT: "מה ראית בגינה?" (What did you see in the garden?) ← Let user tell you!
+✅ CORRECT: Only reference facts from "IMPORTANT MEMORIES" section above
+
+**MANDATORY VERIFICATION:**
+Before stating ANY fact about user's life, check:
+1. Is it in "IMPORTANT MEMORIES" section? → Can mention it
+2. Did user just say it in current conversation? → Can mention it
+3. Is it in "RECENT CONVERSATION" section? → Can mention it
+4. Otherwise → DO NOT MENTION IT! Ask instead!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. **BE PROACTIVE, NOT REACTIVE** (יוזם, לא מגיב)
    ❌ WRONG: "איך אני יכול לעזור לך היום?" (How can I help you today?)
@@ -945,6 +1125,14 @@ ${memories.longTerm.slice(0, 3).map(m => `   - Start with: "ספר לי עוד �
 ❌ NEVER accept one-word answers - always follow up with "ספר לי יותר..." (Tell me more...)
 
 ${isHebrew ? '**זכור: אתה המנהיג של השיחה! תשאל, תחקור, תיזום נושאים!**' : '**Remember: You are the conversation leader! Ask, explore, initiate topics!**'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${userGender === 'male' ? `🚨 FINAL REMINDER: ${userName} = MALE (זכר)
+Always use: אתה, מרגיש, רוצה, שמח, הלכת (masculine forms)
+NEVER use: את, מרגישה, רוצה, שמחה, הלכת (feminine forms)` : `🚨 FINAL REMINDER: ${userName} = FEMALE (נקבה)
+Always use: את, מרגישה, רוצה, שמחה, הלכת (feminine forms)
+NEVER use: אתה, מרגיש, רוצה, שמח, הלכת (masculine forms)`}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # SAFETY RULES
 ${context.safetyRules ? this.formatSafetyRules(context.safetyRules) : 'No safety rules configured yet'}
@@ -1100,8 +1288,42 @@ You: "הנה השיר! מקווה שזה ישפר לך את מצב הרוח." (H
 
   /**
    * Get function definitions for Realtime API
+   * Now accepts music preferences to provide user-specific examples
    */
-  private getFunctionTools(): any[] {
+  private getFunctionTools(musicPreferences?: any): any[] {
+    // Build dynamic music examples from user's preferences
+    let musicExamples = '"ירושלים של זהב", "Naomi Shemer", "Israeli classics"'; // Default fallback
+
+    if (musicPreferences?.enabled) {
+      const examples: string[] = [];
+
+      // Add up to 2 preferred songs
+      if (musicPreferences.preferredSongs?.length > 0) {
+        examples.push(`"${musicPreferences.preferredSongs[0]}"`);
+        if (musicPreferences.preferredSongs.length > 1) {
+          examples.push(`"${musicPreferences.preferredSongs[1]}"`);
+        }
+      }
+
+      // Add 1 preferred artist
+      if (musicPreferences.preferredArtists?.length > 0) {
+        examples.push(`"${musicPreferences.preferredArtists[0]}"`);
+      }
+
+      // Add 1 genre if we still have < 3 examples
+      if (examples.length < 3 && musicPreferences.preferredGenres?.length > 0) {
+        examples.push(`"${musicPreferences.preferredGenres[0]}"`);
+      }
+
+      // Use user's preferences if we got any, otherwise keep defaults
+      if (examples.length > 0) {
+        musicExamples = examples.join(', ');
+        this.logger.log(`🎵 Using personalized music examples in function definition: ${musicExamples}`);
+      }
+    } else {
+      this.logger.log(`🎵 Using default music examples in function definition (no preferences configured)`);
+    }
+
     return [
       {
         type: 'function',
@@ -1213,7 +1435,7 @@ You: "הנה השיר! מקווה שזה ישפר לך את מצב הרוח." (H
           properties: {
             song_identifier: {
               type: 'string',
-              description: 'Song name, artist name, or genre to search for. Examples: "ירושלים של זהב", "Naomi Shemer", "Israeli classics"',
+              description: `Song name, artist name, or genre to search for. Examples: ${musicExamples}`,
             },
             reason: {
               type: 'string',

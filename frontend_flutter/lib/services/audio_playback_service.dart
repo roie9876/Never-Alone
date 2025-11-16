@@ -70,19 +70,21 @@ class AudioPlaybackService extends ChangeNotifier {
   
   /// Start timer to accumulate chunks before playing
   void _startAccumulationTimer() async {
-    // Wait 300ms for chunks to accumulate (reduced from 500ms for lower latency)
-    await Future.delayed(Duration(milliseconds: 300));
+    // Wait 500ms for chunks to accumulate (longer wait to prevent mid-sentence cuts)
+    await Future.delayed(Duration(milliseconds: 500));
     
-    // Check if more chunks arrived recently (within last 150ms)
+    // Check if more chunks arrived recently (within last 300ms)
     final timeSinceLastChunk = DateTime.now().difference(_lastChunkTime);
-    if (timeSinceLastChunk.inMilliseconds < 150 && _audioChunks.length < 50) {
+    if (timeSinceLastChunk.inMilliseconds < 300 && _audioChunks.length < 100) {
       // Still receiving chunks, wait a bit more
+      debugPrint('🔊 AudioPlaybackService: Still receiving chunks (last: ${timeSinceLastChunk.inMilliseconds}ms ago, count: ${_audioChunks.length}), waiting...');
       _startAccumulationTimer();
       return;
     }
     
     // Play accumulated chunks
     if (_audioChunks.isNotEmpty) {
+      debugPrint('🔊 AudioPlaybackService: No recent chunks detected, playing ${_audioChunks.length} chunks now');
       await _playAccumulatedChunks();
     }
   }

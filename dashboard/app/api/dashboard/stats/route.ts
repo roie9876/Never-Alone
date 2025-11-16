@@ -13,19 +13,8 @@ const database = cosmosClient.database('never-alone');
 
 export async function GET(request: NextRequest) {
   try {
-    // Decode token to get userId
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
-    const userId = decoded.userId;
-
-    if (!userId) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
+    // No authentication required - use default user for MVP
+    const userId = 'user-tiferet-001';
 
     // Get today's date range
     const now = new Date();

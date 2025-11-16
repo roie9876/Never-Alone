@@ -14,8 +14,8 @@ interface Conversation {
   userId: string;
   conversationId: string;
   sessionId: string;
-  startTime: string;
-  endTime: string;
+  startedAt: string; // Changed from startTime to match backend
+  endedAt: string;   // Changed from endTime to match backend
   turns: ConversationTurn[];
   totalTurns: number;
 }
@@ -29,29 +29,17 @@ export default function ConversationsPage() {
   const [selectedDate, setSelectedDate] = useState<string>('');
 
   useEffect(() => {
-    // Check authentication
-    const token = localStorage.getItem('authToken');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
+    // No authentication required - MVP mode
     loadConversations();
   }, [router]);
 
   const loadConversations = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('authToken');
       
-      console.log('🔑 Token present:', !!token);
       console.log('🌐 Fetching /api/conversations...');
       
-      const response = await fetch('/api/conversations', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const response = await fetch('/api/conversations');
 
       console.log('📊 Response status:', response.status);
       console.log('📊 Response ok:', response.ok);
@@ -74,16 +62,30 @@ export default function ConversationsPage() {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('he-IL', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(date);
+    if (!dateString) return 'תאריך לא ידוע';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'תאריך לא תקין';
+      return new Intl.DateTimeFormat('he-IL', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(date);
+    } catch (error) {
+      return 'תאריך לא תקין';
+    }
   };
 
   const formatDuration = (startTime: string, endTime: string) => {
-    const duration = Math.floor((new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000);
-    return `${duration} דקות`;
+    if (!startTime || !endTime) return 'לא ידוע';
+    try {
+      const start = new Date(startTime);
+      const end = new Date(endTime);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return 'לא ידוע';
+      const duration = Math.floor((end.getTime() - start.getTime()) / 60000);
+      return `${duration} דקות`;
+    } catch (error) {
+      return 'לא ידוע';
+    }
   };
 
   const filteredConversations = conversations.filter(conv => {
@@ -94,8 +96,12 @@ export default function ConversationsPage() {
     
     // Filter by selected date
     if (selectedDate) {
-      const convDate = new Date(conv.startTime).toISOString().split('T')[0];
-      return matchesSearch && convDate === selectedDate;
+      try {
+        const convDate = new Date(conv.startedAt).toISOString().split('T')[0];
+        return matchesSearch && convDate === selectedDate;
+      } catch {
+        return false; // Skip conversations with invalid dates
+      }
     }
     
     return matchesSearch;
@@ -184,14 +190,14 @@ export default function ConversationsPage() {
                     >
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-gray-500">
-                          {formatDuration(conv.startTime, conv.endTime)}
+                          {formatDuration(conv.startedAt, conv.endedAt)}
                         </span>
                         <span className="text-xs text-purple-600 font-medium">
                           {conv.totalTurns} תורות
                         </span>
                       </div>
                       <p className="text-sm font-medium text-gray-900">
-                        {formatDate(conv.startTime)}
+                        {formatDate(conv.startedAt)}
                       </p>
                       <p className="text-xs text-gray-500 mt-1 line-clamp-2">
                         {conv.turns[0]?.transcript || ''}
@@ -218,10 +224,10 @@ export default function ConversationsPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h2 className="text-xl font-bold text-gray-900">
-                          {formatDate(selectedConv.startTime)}
+                          {formatDate(selectedConv.startedAt)}
                         </h2>
                         <p className="text-sm text-gray-500 mt-1">
-                          משך השיחה: {formatDuration(selectedConv.startTime, selectedConv.endTime)} • {selectedConv.totalTurns} תורות דיבור
+                          משך השיחה: {formatDuration(selectedConv.startedAt, selectedConv.endedAt)} • {selectedConv.totalTurns} תורות דיבור
                         </p>
                       </div>
                       <button

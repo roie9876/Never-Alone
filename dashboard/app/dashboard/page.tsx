@@ -26,27 +26,14 @@ export default function DashboardPage() {
   const [userName, setUserName] = useState('');
 
   useEffect(() => {
-    // Check authentication
-    const token = localStorage.getItem('authToken');
-    const name = localStorage.getItem('familyMemberName');
-    
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    setUserName(name || 'משתמש');
+    // No authentication required - MVP mode
+    setUserName('משפחה');
     loadDashboardStats();
   }, [router]);
 
   const loadDashboardStats = async () => {
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch('/api/dashboard/stats', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch('/api/dashboard/stats');
 
       if (response.ok) {
         const data = await response.json();
@@ -60,9 +47,7 @@ export default function DashboardPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('familyMemberName');
-    router.push('/login');
+    // No authentication - do nothing for MVP
   };
 
   if (loading) {

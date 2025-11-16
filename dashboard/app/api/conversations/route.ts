@@ -29,14 +29,8 @@ function authenticateUser(request: NextRequest): string | null {
 
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate
-    const userEmail = authenticateUser(request);
-    if (!userEmail) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    // No authentication required - use default user for MVP
+    const userId = 'user-tiferet-001';
 
     // Connect to Cosmos DB using Azure AD
     const credential = new DefaultAzureCredential();
@@ -47,33 +41,6 @@ export async function GET(request: NextRequest) {
 
     const database = client.database('never-alone');
 
-    // Get family member to find their userId
-    const familyMembersContainer = database.container('FamilyMembers');
-    
-    console.log('🔍 Looking for email:', userEmail);
-    
-    const { resources: familyMembers } = await familyMembersContainer.items
-      .query({
-        query: 'SELECT * FROM c WHERE c.email = @email',
-        parameters: [{ name: '@email', value: userEmail }],
-      })
-      .fetchAll();
-
-    console.log('📋 Family members found:', familyMembers.length);
-    if (familyMembers.length > 0) {
-      console.log('✅ First match:', { email: familyMembers[0].email, userId: familyMembers[0].userId });
-    }
-
-    if (familyMembers.length === 0) {
-      console.error('❌ No family member found for email:', userEmail);
-      return NextResponse.json(
-        { error: 'Family member not found' },
-        { status: 404 }
-      );
-    }
-
-    const userId = familyMembers[0].userId;
-
     // Query conversations from lowercase container (has full transcripts)
     const conversationsContainer = database.container('conversations');
     const { resources: conversations } = await conversationsContainer.items
@@ -81,7 +48,7 @@ export async function GET(request: NextRequest) {
         query: `
           SELECT * FROM c 
           WHERE c.userId = @userId 
-          ORDER BY c.startTime DESC
+          ORDER BY c.startedAt DESC
         `,
         parameters: [{ name: '@userId', value: userId }],
       })
